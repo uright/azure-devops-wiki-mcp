@@ -77,4 +77,19 @@ export interface AzureDevOpsConfig {
   organization: string;
   project: string;
   personalAccessToken?: string;
+  azureDevOpsUrl?: string;
+}
+
+export const EnvironmentConfigSchema = z.object({
+  AZURE_DEVOPS_URL: z.string().url().optional(),
+  AZURE_DEVOPS_PROJECT: z.string().min(1).optional(),
+  AZURE_DEVOPS_PAT: z.string().min(1).optional(),
+});
+
+export type EnvironmentConfig = z.infer<typeof EnvironmentConfigSchema>;
+
+export interface ServerConfig {
+  azureDevOpsUrl?: string;
+  defaultProject?: string;
+  personalAccessToken?: string;
 }

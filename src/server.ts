@@ -9,13 +9,18 @@ import {
   WikiSearchRequestSchema, 
   WikiPageTreeRequestSchema, 
   WikiGetPageRequestSchema, 
-  WikiUpdatePageRequestSchema 
+  WikiUpdatePageRequestSchema,
+  EnvironmentConfigSchema,
+  ServerConfig
 } from './types.js';
 
 export class AzureDevOpsWikiServer {
   private client: AzureDevOpsWikiClient | null = null;
+  private config: ServerConfig;
 
-  constructor(private server: Server) {}
+  constructor(private server: Server) {
+    this.config = this.loadConfiguration();
+  }
 
   async initialize(): Promise<void> {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -165,9 +170,30 @@ export class AzureDevOpsWikiServer {
     });
   }
 
-  private async getClient(organization: string): Promise<AzureDevOpsWikiClient> {
+  private loadConfiguration(): ServerConfig {
+    try {
+      const envConfig = EnvironmentConfigSchema.parse(process.env);
+      return {
+        azureDevOpsUrl: envConfig.AZURE_DEVOPS_URL,
+        defaultProject: envConfig.AZURE_DEVOPS_PROJECT,
+        personalAccessToken: envConfig.AZURE_DEVOPS_PAT
+      };
+    } catch (error) {
+      console.error('Environment configuration validation failed:', error);
+      return {};
+    }
+  }
+
+  private async getClient(organization: string, project?: string): Promise<AzureDevOpsWikiClient> {
     if (!this.client) {
-      this.client = new AzureDevOpsWikiClient({ organization, project: '' });
+      const clientConfig = {
+        organization,
+        project: project || this.config.defaultProject || '',
+        personalAccessToken: this.config.personalAccessToken,
+        azureDevOpsUrl: this.config.azureDevOpsUrl
+      };
+      
+      this.client = new AzureDevOpsWikiClient(clientConfig);
       await this.client.initialize();
     }
     return this.client;
@@ -175,7 +201,7 @@ export class AzureDevOpsWikiServer {
 
   private async handleSearchWiki(args: any) {
     const request = WikiSearchRequestSchema.parse(args);
-    const client = await this.getClient(request.organization);
+    const client = await this.getClient(request.organization, request.project);
     const results = await client.searchWiki(request);
     
     return {
@@ -188,7 +214,7 @@ export class AzureDevOpsWikiServer {
 
   private async handleGetPageTree(args: any) {
     const request = WikiPageTreeRequestSchema.parse(args);
-    const client = await this.getClient(request.organization);
+    const client = await this.getClient(request.organization, request.project);
     const tree = await client.getPageTree(request);
     
     return {
@@ -201,7 +227,7 @@ export class AzureDevOpsWikiServer {
 
   private async handleGetPage(args: any) {
     const request = WikiGetPageRequestSchema.parse(args);
-    const client = await this.getClient(request.organization);
+    const client = await this.getClient(request.organization, request.project);
     const page = await client.getPage(request);
     
     return {
@@ -214,7 +240,7 @@ export class AzureDevOpsWikiServer {
 
   private async handleUpdatePage(args: any) {
     const request = WikiUpdatePageRequestSchema.parse(args);
-    const client = await this.getClient(request.organization);
+    const client = await this.getClient(request.organization, request.project);
     const result = await client.updatePage(request);
     
     return {

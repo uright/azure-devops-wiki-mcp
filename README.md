@@ -90,13 +90,46 @@ Update content of an existing wiki page.
 
 ## Authentication
 
-This server uses Azure CLI authentication. Make sure you're logged in:
+This server supports two authentication methods:
+
+### 1. Azure CLI Authentication (Default)
+
+Make sure you're logged in:
 
 ```bash
 az login
 ```
 
 The server will use your Azure CLI credentials to authenticate with Azure DevOps.
+
+### 2. Personal Access Token (PAT)
+
+You can also use a Personal Access Token for authentication by setting environment variables:
+
+```bash
+export AZURE_DEVOPS_URL="https://dev.azure.com/your-organization"
+export AZURE_DEVOPS_PROJECT="your-default-project"
+export AZURE_DEVOPS_PAT="your-personal-access-token"
+```
+
+**Quick Setup:**
+1. Copy the example environment file: `cp example.env .env`
+2. Edit `.env` with your actual values
+3. Load the environment: `source .env` or use a tool like `dotenv`
+
+**Creating a PAT:**
+1. Go to Azure DevOps → User Settings → Personal Access Tokens
+2. Create a new token with the following scopes:
+   - **Wiki**: Read & Write
+   - **Project and Team**: Read (for project access)
+3. Copy the token and set it in the `AZURE_DEVOPS_PAT` environment variable
+
+**Environment Variables:**
+- `AZURE_DEVOPS_URL`: Your Azure DevOps organization URL (optional, defaults to `https://dev.azure.com/{organization}`)
+- `AZURE_DEVOPS_PROJECT`: Default project name (optional, can be overridden per request)
+- `AZURE_DEVOPS_PAT`: Personal Access Token (optional, falls back to Azure CLI if not provided)
+
+When using PAT authentication, the server will prioritize the PAT over Azure CLI credentials.
 
 ## Development
 

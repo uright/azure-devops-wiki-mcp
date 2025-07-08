@@ -68,10 +68,26 @@ The server provides four main tools:
 
 ## Authentication Requirements
 
-The server requires Azure CLI authentication:
+The server supports two authentication methods:
+
+### 1. Azure CLI Authentication (Default)
 1. User must be logged in via `az login`
 2. Must have appropriate permissions for target Azure DevOps organization
 3. Wiki access permissions required for read/write operations
+
+### 2. Personal Access Token (PAT)
+Environment variables for PAT authentication:
+- `AZURE_DEVOPS_URL`: Azure DevOps organization URL (optional)
+- `AZURE_DEVOPS_PROJECT`: Default project name (optional)
+- `AZURE_DEVOPS_PAT`: Personal Access Token (optional)
+
+**Developer Setup**: Copy `example.env` to `.env` and configure with actual values
+
+PAT requires the following scopes:
+- **Wiki**: Read & Write
+- **Project and Team**: Read (for project access)
+
+Authentication priority: PAT takes precedence over Azure CLI credentials when both are available.
 
 ## Tool Specifications
 
@@ -148,5 +164,8 @@ When implementing these methods, refer to the azure-devops-node-api documentatio
 - Page content is stored as Markdown and should be handled accordingly
 - Wiki operations are backed by Git, so concurrent modifications need consideration
 - Follow security best practices for handling Azure DevOps credentials
-- Use `@azure/identity` DefaultAzureCredential for authentication
+- Use `@azure/identity` DefaultAzureCredential for authentication (fallback)
+- PAT authentication via `azure-devops-node-api` getPersonalAccessTokenHandler
 - All request parameters are validated using Zod schemas in `src/types.ts`
+- Environment variables are validated using `EnvironmentConfigSchema` in `src/types.ts`
+- Server configuration is loaded from environment variables in `src/server.ts`

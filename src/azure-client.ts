@@ -32,7 +32,8 @@ export class AzureDevOpsWikiClient {
         authHandler = azdev.getBearerHandler(token.token);
       }
 
-      const orgUrl = `https://dev.azure.com/${this.config.organization}`;
+      // Support custom Azure DevOps URL or default to dev.azure.com
+      const orgUrl = this.config.azureDevOpsUrl || `https://dev.azure.com/${this.config.organization}`;
       this.connection = new azdev.WebApi(orgUrl, authHandler);
       
       this.wikiApi = await this.connection.getWikiApi();
