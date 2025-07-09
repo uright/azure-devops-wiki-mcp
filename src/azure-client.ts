@@ -20,6 +20,23 @@ export class AzureDevOpsWikiClient {
 
   constructor(private config: AzureDevOpsConfig) {}
 
+  private formatPagePath(path: string): string {
+    if (!path) return '';
+    
+    // Remove leading slash if present
+    let formattedPath = path;
+    
+    // Remove .md extension if present
+    if (formattedPath.endsWith('.md')) {
+      formattedPath = formattedPath.substring(0, formattedPath.length - 3);
+    }
+    
+    // Replace hyphens with spaces
+    formattedPath = formattedPath.replace(/-/g, ' ');
+    
+    return formattedPath;
+  }
+
   async initialize(): Promise<void> {
     try {
       let authHandler: IRequestHandler;
@@ -42,8 +59,93 @@ export class AzureDevOpsWikiClient {
     }
   }
 
-  async searchWiki(_request: WikiSearchRequest): Promise<WikiSearchResult[]> {
-    throw new Error('Search functionality not implemented yet - requires search API integration');
+  async searchWiki(request: WikiSearchRequest): Promise<WikiSearchResult[]> {
+    if (!this.wikiApi || !this.connection) {
+      throw new Error('Azure DevOps client not initialized');
+    }
+
+    try {
+      const organization = request.organization || this.config.organization;
+      const project = request.project || this.config.project;
+      
+      if (!organization || !project) {
+        throw new Error('Organization and project must be provided');
+      }
+
+      const searchApiUrl = `https://almsearch.dev.azure.com/${organization}/${project}/_apis/search/wikisearchresults?api-version=7.1`;
+      
+      interface WikiSearchRequestBody {
+        searchText: string;
+        $skip: number;
+        $top: number;
+        includeFacets: boolean;
+        filters?: {
+          Wiki?: string[];
+        };
+      }
+
+      const requestBody: WikiSearchRequestBody = {
+        searchText: request.searchText,
+        $skip: 0,
+        $top: 100, // Default to 100 results
+        includeFacets: false
+      };
+
+      // Add wiki filter if specified
+      if (request.wikiId) {
+        requestBody.filters = {
+          Wiki: [request.wikiId]
+        };
+      }
+
+      const response = await this.connection.rest.client.post(searchApiUrl, JSON.stringify(requestBody), {
+        'Content-Type': 'application/json'
+      });
+      
+      if (!response.message || response.message.statusCode !== 200) {
+        throw new Error(`Search failed: HTTP ${response.message?.statusCode || 'Unknown'}`);
+      }
+
+      const responseBody = await response.readBody();
+      if (!responseBody) {
+        return [];
+      }
+
+      const data = JSON.parse(responseBody);
+      
+      if (!data.results || !Array.isArray(data.results)) {
+        return [];
+      }
+
+      interface WikiSearchResultItem {
+        fileName?: string;
+        path?: string;
+        url?: string;
+        matches?: {
+          content?: { text: string }[];
+        };
+        project?: {
+          name: string;
+        };
+        wiki?: {
+          name: string;
+        };
+      }
+
+      return data.results.map((result: WikiSearchResultItem) => ({
+        title: result.fileName || (result.path ? result.path.split('/').pop() || 'Unknown' : 'Unknown'),
+        url: result.url || '',
+        content: result.matches && result.matches.content 
+          ? result.matches.content.map((match) => match.text).join(' ')
+          : '',
+        project: result.project?.name || project,
+        wiki: result.wiki?.name || request.wikiId || 'Unknown',
+        pagePath: this.formatPagePath(result.path || '')
+      }));
+
+    } catch (error) {
+      throw new Error(`Failed to search wiki: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async getPageTree(request: WikiPageTreeRequest): Promise<WikiPageNode[]> {

@@ -40,6 +40,7 @@ export interface WikiSearchResult {
   content: string;
   project: string;
   wiki: string;
+  pagePath: string;
 }
 
 export interface WikiPageNode {

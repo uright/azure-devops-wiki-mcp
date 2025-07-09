@@ -94,7 +94,7 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
 ### search_wiki
 **Purpose**: Search across wiki content using Azure DevOps Search API
 **Parameters**: organization, project, searchText, wikiId (optional)
-**Output**: Array of search results with page titles, content snippets, and URLs
+**Output**: Array of search results with page titles, content snippets, URLs, and pagePath for use with wiki_get_page
 
 ### wiki_get_page_tree
 **Purpose**: Retrieve hierarchical page structure from wiki
@@ -154,13 +154,18 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
   - Comprehensive unit test coverage with success/error scenarios
 
 ### Methods Requiring Implementation
-- **`search_wiki`**: ❌ Requires proper Search API integration
+- **`search_wiki`**: ✅ Fully implemented using Azure DevOps Search API
+  - Uses direct HTTP client calls to `/search/wikisearchresults` endpoint
+  - Handles search queries with optional wiki filtering
+  - Returns search results with `pagePath` attribute for use with `wiki_get_page`
+  - Comprehensive error handling for API failures and malformed responses
+  - Comprehensive unit test coverage with success/error scenarios
 
 ### Implementation Notes
 - `wiki_get_page_tree` bypasses azure-devops-node-api limitations by using direct REST calls
-- Future implementations should consider similar REST API approach for missing methods
+- `search_wiki` uses the Azure DevOps Search API with direct REST calls for better control
 - All implemented methods include comprehensive error handling and type safety
-- When implementing remaining methods, refer to the azure-devops-node-api documentation and REST API specs
+- Consistent title extraction logic across all methods using `path.split('/').pop()`
 
 ## Security Considerations
 

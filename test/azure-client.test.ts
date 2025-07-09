@@ -1,5 +1,5 @@
 import { AzureDevOpsWikiClient } from '../src/azure-client';
-import { WikiPageTreeRequest, WikiGetPageRequest, WikiUpdatePageRequest } from '../src/types';
+import { WikiPageTreeRequest, WikiGetPageRequest, WikiUpdatePageRequest, WikiSearchRequest } from '../src/types';
 import * as azdev from 'azure-devops-node-api';
 import { WikiApi } from 'azure-devops-node-api/WikiApi';
 import { DefaultAzureCredential } from '@azure/identity';
@@ -27,7 +27,8 @@ describe('AzureDevOpsWikiClient', () => {
 
     // Mock REST client
     mockRestClient = {
-      get: jest.fn()
+      get: jest.fn(),
+      post: jest.fn()
     };
 
     // Mock HTTP client for WikiApi
@@ -63,6 +64,385 @@ describe('AzureDevOpsWikiClient', () => {
     (azdev.getBearerHandler as jest.Mock).mockReturnValue({});
 
     client = new AzureDevOpsWikiClient(mockConfig);
+  });
+
+  describe('searchWiki', () => {
+    beforeEach(async () => {
+      await client.initialize();
+    });
+
+    describe('success scenarios', () => {
+      it('should return search results for basic search query', async () => {
+        const mockRequest: WikiSearchRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          searchText: 'test query'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            count: 2,
+            results: [
+              {
+                fileName: 'Home.md',
+                path: '/Home',
+                url: 'https://dev.azure.com/testorg/testproject/_wiki/wikis/wiki123?pagePath=/Home',
+                matches: {
+                  content: [
+                    { text: 'This is a test page with query content' }
+                  ]
+                },
+                project: {
+                  name: 'testproject'
+                },
+                wiki: {
+                  name: 'wiki123'
+                }
+              },
+              {
+                fileName: 'Getting-Started.md',
+                path: '/Getting-Started',
+                url: 'https://dev.azure.com/testorg/testproject/_wiki/wikis/wiki123?pagePath=/Getting-Started',
+                matches: {
+                  content: [
+                    { text: 'Getting started with test framework' }
+                  ]
+                },
+                project: {
+                  name: 'testproject'
+                },
+                wiki: {
+                  name: 'wiki123'
+                }
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        const result = await client.searchWiki(mockRequest);
+
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({
+          title: 'Home.md',
+          url: 'https://dev.azure.com/testorg/testproject/_wiki/wikis/wiki123?pagePath=/Home',
+          content: 'This is a test page with query content',
+          project: 'testproject',
+          wiki: 'wiki123',
+          pagePath: '/Home'
+        });
+        expect(result[1]).toEqual({
+          title: 'Getting-Started.md',
+          url: 'https://dev.azure.com/testorg/testproject/_wiki/wikis/wiki123?pagePath=/Getting-Started',
+          content: 'Getting started with test framework',
+          project: 'testproject',
+          wiki: 'wiki123',
+          pagePath: '/Getting Started'
+        });
+
+        // Verify API call was made correctly
+        expect(mockRestClient.post).toHaveBeenCalledWith(
+          'https://almsearch.dev.azure.com/testorg/testproject/_apis/search/wikisearchresults?api-version=7.1',
+          JSON.stringify({
+            searchText: 'test query',
+            $skip: 0,
+            $top: 100,
+            includeFacets: false
+          }),
+          {
+            'Content-Type': 'application/json'
+          }
+        );
+      });
+
+      it('should return search results with wiki filter applied', async () => {
+        const mockRequest: WikiSearchRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          searchText: 'filtered query',
+          wikiId: 'specific-wiki'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            count: 1,
+            results: [
+              {
+                fileName: 'Filtered.md',
+                path: '/Filtered',
+                url: 'https://dev.azure.com/testorg/testproject/_wiki/wikis/specific-wiki?pagePath=/Filtered',
+                matches: {
+                  content: [
+                    { text: 'Filtered content matches' }
+                  ]
+                },
+                project: {
+                  name: 'testproject'
+                },
+                wiki: {
+                  name: 'specific-wiki'
+                }
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        const result = await client.searchWiki(mockRequest);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual({
+          title: 'Filtered.md',
+          url: 'https://dev.azure.com/testorg/testproject/_wiki/wikis/specific-wiki?pagePath=/Filtered',
+          content: 'Filtered content matches',
+          project: 'testproject',
+          wiki: 'specific-wiki',
+          pagePath: '/Filtered'
+        });
+
+        // Verify API call included wiki filter
+        expect(mockRestClient.post).toHaveBeenCalledWith(
+          'https://almsearch.dev.azure.com/testorg/testproject/_apis/search/wikisearchresults?api-version=7.1',
+          JSON.stringify({
+            searchText: 'filtered query',
+            $skip: 0,
+            $top: 100,
+            includeFacets: false,
+            filters: {
+              Wiki: ['specific-wiki']
+            }
+          }),
+          {
+            'Content-Type': 'application/json'
+          }
+        );
+      });
+
+      it('should return empty array when no results found', async () => {
+        const mockRequest: WikiSearchRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          searchText: 'nonexistent query'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            count: 0,
+            results: []
+          }))
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        const result = await client.searchWiki(mockRequest);
+
+        expect(result).toHaveLength(0);
+      });
+
+      it('should handle search results with missing optional fields', async () => {
+        const mockRequest: WikiSearchRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          searchText: 'minimal result'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            count: 1,
+            results: [
+              {
+                path: '/minimal'
+                // Missing fileName, url, matches, project, collection
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        const result = await client.searchWiki(mockRequest);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual({
+          title: 'minimal',
+          url: '',
+          content: '',
+          project: 'testproject',
+          wiki: 'Unknown',
+          pagePath: '/minimal'
+        });
+      });
+
+      it('should use default organization and project from config', async () => {
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'config defaults test'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            count: 0,
+            results: []
+          }))
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        await client.searchWiki(mockRequest);
+
+        expect(mockRestClient.post).toHaveBeenCalledWith(
+          'https://almsearch.dev.azure.com/testorg/testproject/_apis/search/wikisearchresults?api-version=7.1',
+          JSON.stringify({
+            searchText: 'config defaults test',
+            $skip: 0,
+            $top: 100,
+            includeFacets: false
+          }),
+          {
+            'Content-Type': 'application/json'
+          }
+        );
+      });
+    });
+
+    describe('error scenarios', () => {
+      it('should throw error when client is not initialized', async () => {
+        const uninitializedClient = new AzureDevOpsWikiClient(mockConfig);
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        await expect(uninitializedClient.searchWiki(mockRequest)).rejects.toThrow('Azure DevOps client not initialized');
+      });
+
+      it('should throw error when organization is missing', async () => {
+        const clientWithoutOrg = new AzureDevOpsWikiClient({
+          organization: '',
+          project: 'testproject'
+        });
+        await clientWithoutOrg.initialize();
+
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        await expect(clientWithoutOrg.searchWiki(mockRequest)).rejects.toThrow('Organization and project must be provided');
+      });
+
+      it('should throw error when project is missing', async () => {
+        const clientWithoutProject = new AzureDevOpsWikiClient({
+          organization: 'testorg',
+          project: ''
+        });
+        await clientWithoutProject.initialize();
+
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        await expect(clientWithoutProject.searchWiki(mockRequest)).rejects.toThrow('Organization and project must be provided');
+      });
+
+      it('should throw error when search API returns non-200 status', async () => {
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 400 },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        await expect(client.searchWiki(mockRequest)).rejects.toThrow('Search failed: HTTP 400');
+      });
+
+      it('should throw error when search API returns empty response body', async () => {
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        const result = await client.searchWiki(mockRequest);
+        expect(result).toEqual([]);
+      });
+
+      it('should throw error when search API returns malformed response', async () => {
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue('invalid json')
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        await expect(client.searchWiki(mockRequest)).rejects.toThrow('Failed to search wiki:');
+      });
+
+      it('should handle network errors gracefully', async () => {
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        mockRestClient.post.mockRejectedValue(new Error('Network error'));
+
+        await expect(client.searchWiki(mockRequest)).rejects.toThrow('Failed to search wiki: Network error');
+      });
+
+      it('should return empty array when response has no results property', async () => {
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            count: 0
+            // Missing results property
+          }))
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        const result = await client.searchWiki(mockRequest);
+        expect(result).toEqual([]);
+      });
+
+      it('should return empty array when results is not an array', async () => {
+        const mockRequest: WikiSearchRequest = {
+          searchText: 'test query'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            count: 1,
+            results: 'not an array'
+          }))
+        };
+
+        mockRestClient.post.mockResolvedValue(mockResponse);
+
+        const result = await client.searchWiki(mockRequest);
+        expect(result).toEqual([]);
+      });
+    });
   });
 
   describe('getPageTree', () => {
