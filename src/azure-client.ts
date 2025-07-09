@@ -177,8 +177,113 @@ export class AzureDevOpsWikiClient {
     }
   }
 
-  async updatePage(_request: WikiUpdatePageRequest): Promise<WikiPageUpdateResult> {
-    throw new Error('Update page functionality not implemented yet - requires proper API method');
+  async updatePage(request: WikiUpdatePageRequest): Promise<WikiPageUpdateResult> {
+    if (!this.wikiApi || !this.connection) {
+      throw new Error('Azure DevOps client not initialized');
+    }
+
+    try {
+      const organization = request.organization || this.config.organization;
+      const project = request.project || this.config.project;
+      
+      if (!organization || !project) {
+        throw new Error('Organization and project must be provided');
+      }
+
+      // Set encoded pagePath
+      const encodedPath = encodeURIComponent(request.path);
+
+      // Get wiki object
+      const wiki = await this.wikiApi.getWiki(request.wikiId, project);
+      
+      // First, check if page exists to get version for updates
+      let pageVersion: string | undefined;
+      let pageExists = false;
+      
+      try {
+        let wikiPageResponse = await this.wikiApi.http.get(`${wiki.url}/pages?path=${encodedPath}`);
+
+        if (wikiPageResponse.message && wikiPageResponse.message.statusCode === 200) {
+          pageExists = true;
+          pageVersion = wikiPageResponse.message.headers.etag;
+        }
+      } catch (checkError) {
+        // Page doesn't exist, we'll create it
+        pageExists = false;
+      }
+
+      // Create headers object with proper typing
+      const headers: { [key: string]: string } = {
+        'Content-Type': 'application/json'
+      };
+
+      // Only add If-Match header if page exists and we have a version
+      // For new pages, don't include If-Match header
+      if (pageExists && pageVersion) {
+        headers['If-Match'] = pageVersion;
+      }
+
+      const requestBody = {
+        content: request.content
+      };
+
+      // TODO: Add versionDescriptor.versionType and versionDescriptor.version as optional environment variables
+      const apiUrl = `${wiki.url}/pages?path=${encodedPath}&api-version=7.1&versionDescriptor.versionType=branch&versionDescriptor.version=master`;
+      
+      const response = await this.wikiApi.http.put(apiUrl, JSON.stringify(requestBody), headers);
+      
+      if (!response.message || (response.message.statusCode !== 200 && response.message.statusCode !== 201)) {
+        // Enhanced error information for debugging
+        const errorDetails: {
+          statusCode: number | undefined;
+          statusMessage: string | undefined;
+          headers: { [key: string]: string | string[] | undefined } | undefined;
+          url: string;
+          requestHeaders: { [key: string]: string };
+          requestBody: { content: string };
+          pageExists: boolean;
+          pageVersion: string | undefined;
+          responseBody?: string;
+        } = {
+          statusCode: response.message?.statusCode,
+          statusMessage: response.message?.statusMessage,
+          headers: response.message?.headers,
+          url: apiUrl,
+          requestHeaders: headers,
+          requestBody: requestBody,
+          pageExists,
+          pageVersion
+        };
+        
+        throw new Error(`Failed to ${pageExists ? 'update' : 'create'} page: HTTP ${response.message?.statusCode || 'Unknown'}. Details: ${JSON.stringify(errorDetails, null, 2)}`);
+      }
+
+      const responseBody = await response.readBody();
+      if (!responseBody) {
+        throw new Error('Empty response body');
+      }
+
+      const data = JSON.parse(responseBody);
+      
+      // Handle the response structure
+      let pageData = data.value || data;
+      
+      if (!pageData || pageData === null || (data.value !== undefined && data.value === null)) {
+        throw new Error(`Failed to ${pageExists ? 'update' : 'create'} page: ${request.path}`);
+      }
+
+      return {
+        id: pageData.id?.toString() || '',
+        path: pageData.path || request.path,
+        title: pageData.path ? pageData.path.split('/').pop() || '' : '',
+        version: pageData.version || response.message.headers.etag || '',
+        isParentPage: pageData.isParentPage || false,
+        order: pageData.order || 0,
+        gitItemPath: pageData.gitItemPath || ''
+      };
+    } catch (error) {
+      throw new Error(`Failed to update page: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
 }

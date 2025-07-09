@@ -27,7 +27,6 @@ export const WikiUpdatePageRequestSchema = z.object({
   wikiId: z.string().min(1),
   path: z.string().min(1),
   content: z.string(),
-  version: z.string().min(1),
 });
 
 export type WikiSearchRequest = z.infer<typeof WikiSearchRequestSchema>;

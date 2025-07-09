@@ -129,13 +129,9 @@ export class AzureDevOpsWikiServer {
                 content: {
                   type: 'string',
                   description: 'New page content (Markdown)'
-                },
-                version: {
-                  type: 'string',
-                  description: 'Page version for concurrency control'
                 }
               },
-              required: ['wikiId', 'path', 'content', 'version']
+              required: ['wikiId', 'path', 'content']
             }
           }
         ] as Tool[]

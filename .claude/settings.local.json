@@ -12,7 +12,9 @@
       "Bash(npm test)",
       "Bash(npm run lint)",
       "Bash(git commit:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "WebFetch(domain:docs.microsoft.com)",
+      "Bash(npm test:*)"
     ],
     "deny": []
   }

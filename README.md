@@ -187,6 +187,20 @@ npm run watch
 npm run lint
 ```
 
+### Debug in IDE
+
+1. Start up @modelcontextprotocol/inspector with inspection turned on
+```bash
+mcp-inspector node --inspect dist/index.js
+
+# Alternatively, set the environment variables when you launch it
+mcp-inspector -e AZURE_DEVOPS_URL="Your DevOps URL" -e AZURE_DEVOPS_PROJECT="Your DevOps Project" -e AZURE_DEVOPS_PAT="Your PAT" -e AZURE_DEVOPS_ORGANIZATION="Your DevOps Organization" node --inspect dist/index.js
+```
+
+2. Use IDE (vscode / cursor), select "Attach to MCP Server" and start debug
+
+3. Enter local test data from MCP Inspector UI
+
 ## Architecture
 
 The server follows the Model Context Protocol specification and integrates with Azure DevOps Wiki API through the official `azure-devops-node-api` client library.

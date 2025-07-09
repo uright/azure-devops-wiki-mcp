@@ -1,5 +1,5 @@
 import { AzureDevOpsWikiClient } from '../src/azure-client';
-import { WikiPageTreeRequest, WikiGetPageRequest } from '../src/types';
+import { WikiPageTreeRequest, WikiGetPageRequest, WikiUpdatePageRequest } from '../src/types';
 import * as azdev from 'azure-devops-node-api';
 import { WikiApi } from 'azure-devops-node-api/WikiApi';
 import { DefaultAzureCredential } from '@azure/identity';
@@ -14,6 +14,7 @@ describe('AzureDevOpsWikiClient', () => {
   let mockConnection: jest.Mocked<azdev.WebApi>;
   let mockWikiApi: jest.Mocked<WikiApi>;
   let mockRestClient: jest.Mocked<any>;
+  let mockHttpClient: jest.Mocked<any>;
 
   const mockConfig = {
     organization: 'testorg',
@@ -29,9 +30,17 @@ describe('AzureDevOpsWikiClient', () => {
       get: jest.fn()
     };
 
+    // Mock HTTP client for WikiApi
+    mockHttpClient = {
+      get: jest.fn(),
+      put: jest.fn()
+    };
+
     // Mock WikiApi
     mockWikiApi = {
-      getPagesBatch: jest.fn()
+      getPagesBatch: jest.fn(),
+      getWiki: jest.fn(),
+      http: mockHttpClient
     } as any;
 
     // Mock WebApi connection
@@ -901,6 +910,764 @@ describe('AzureDevOpsWikiClient', () => {
         await expect(client.getPage(mockRequest)).rejects.toThrow(
           'Failed to get page: HTTP Unknown'
         );
+      });
+    });
+  });
+
+  describe('updatePage', () => {
+    beforeEach(async () => {
+      await client.initialize();
+    });
+
+    describe('success scenarios', () => {
+      it('should update an existing page successfully', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Updated Home Page\n\nThis is the updated content.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { 
+            statusCode: 200,
+            headers: { etag: 'abc123' }
+          }
+        };
+
+        const mockUpdateResponse = {
+          message: { 
+            statusCode: 200,
+            headers: { etag: 'def456' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            id: 1,
+            path: '/Home',
+            version: 'def456',
+            isParentPage: false,
+            order: 1,
+            gitItemPath: '/Home.md'
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockUpdateResponse);
+
+        const result = await client.updatePage(mockRequest);
+
+        expect(result).toEqual({
+          id: '1',
+          path: '/Home',
+          title: 'Home',
+          version: 'def456',
+          isParentPage: false,
+          order: 1,
+          gitItemPath: '/Home.md'
+        });
+
+        expect(mockWikiApi.getWiki).toHaveBeenCalledWith('wiki123', 'testproject');
+        expect(mockHttpClient.get).toHaveBeenCalledWith(
+          expect.stringContaining('pages?path=%2FHome')
+        );
+        expect(mockHttpClient.put).toHaveBeenCalledWith(
+          expect.stringContaining('pages?path=%2FHome'),
+          JSON.stringify({ content: '# Updated Home Page\n\nThis is the updated content.' }),
+          expect.objectContaining({
+            'Content-Type': 'application/json',
+            'If-Match': 'abc123'
+          })
+        );
+      });
+
+      it('should create a new page when page does not exist', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/New-Page',
+          content: '# New Page\n\nThis is a new page.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'new123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            id: 2,
+            path: '/New-Page',
+            version: 'new123',
+            isParentPage: false,
+            order: 0,
+            gitItemPath: '/New-Page.md'
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        const result = await client.updatePage(mockRequest);
+
+        expect(result).toEqual({
+          id: '2',
+          path: '/New-Page',
+          title: 'New-Page',
+          version: 'new123',
+          isParentPage: false,
+          order: 0,
+          gitItemPath: '/New-Page.md'
+        });
+
+        expect(mockHttpClient.put).toHaveBeenCalledWith(
+          expect.stringContaining('pages?path=%2FNew-Page'),
+          JSON.stringify({ content: '# New Page\n\nThis is a new page.' }),
+          expect.objectContaining({
+            'Content-Type': 'application/json'
+          })
+        );
+        expect(mockHttpClient.put).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          expect.not.objectContaining({ 'If-Match': expect.anything() })
+        );
+      });
+
+      it('should handle page check failure and create new page', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Error-Check-Page',
+          content: '# Error Check Page\n\nContent after error.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'error123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            id: 3,
+            path: '/Error-Check-Page',
+            version: 'error123',
+            isParentPage: false,
+            order: 0,
+            gitItemPath: '/Error-Check-Page.md'
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockRejectedValue(new Error('Check failed'));
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        const result = await client.updatePage(mockRequest);
+
+        expect(result).toEqual({
+          id: '3',
+          path: '/Error-Check-Page',
+          title: 'Error-Check-Page',
+          version: 'error123',
+          isParentPage: false,
+          order: 0,
+          gitItemPath: '/Error-Check-Page.md'
+        });
+      });
+
+      it('should handle nested page paths correctly', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Documentation/API/Authentication',
+          content: '# Updated Authentication\n\nUpdated authentication docs.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { 
+            statusCode: 200,
+            headers: { etag: 'auth123' }
+          }
+        };
+
+        const mockUpdateResponse = {
+          message: { 
+            statusCode: 200,
+            headers: { etag: 'auth456' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            id: 10,
+            path: '/Documentation/API/Authentication',
+            version: 'auth456',
+            isParentPage: false,
+            order: 3,
+            gitItemPath: '/Documentation/API/Authentication.md'
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockUpdateResponse);
+
+        const result = await client.updatePage(mockRequest);
+
+        expect(result.title).toBe('Authentication');
+        expect(result.path).toBe('/Documentation/API/Authentication');
+        expect(mockHttpClient.put).toHaveBeenCalledWith(
+          expect.stringContaining('path=%2FDocumentation%2FAPI%2FAuthentication'),
+          expect.anything(),
+          expect.anything()
+        );
+      });
+
+      it('should properly encode the path parameter', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Special Page with Spaces & Symbols',
+          content: '# Special Page\n\nSpecial content.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'special123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            id: 5,
+            path: '/Special Page with Spaces & Symbols',
+            version: 'special123',
+            isParentPage: false,
+            order: 0,
+            gitItemPath: '/Special Page with Spaces & Symbols.md'
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await client.updatePage(mockRequest);
+
+        expect(mockHttpClient.get).toHaveBeenCalledWith(
+          expect.stringContaining('path=%2FSpecial%20Page%20with%20Spaces%20%26%20Symbols')
+        );
+        expect(mockHttpClient.put).toHaveBeenCalledWith(
+          expect.stringContaining('path=%2FSpecial%20Page%20with%20Spaces%20%26%20Symbols'),
+          expect.anything(),
+          expect.anything()
+        );
+      });
+
+      it('should use config organization/project when not provided in request', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nUpdated home content.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'config123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            id: 1,
+            path: '/Home',
+            version: 'config123',
+            isParentPage: false,
+            order: 1,
+            gitItemPath: '/Home.md'
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await client.updatePage(mockRequest);
+
+        expect(mockWikiApi.getWiki).toHaveBeenCalledWith('wiki123', 'testproject');
+      });
+
+      it('should use fallback values for missing response properties', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Minimal',
+          content: '# Minimal\n\nMinimal content.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'minimal123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            path: '/Minimal'
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        const result = await client.updatePage(mockRequest);
+
+        expect(result).toEqual({
+          id: '',
+          path: '/Minimal',
+          title: 'Minimal',
+          version: 'minimal123',
+          isParentPage: false,
+          order: 0,
+          gitItemPath: ''
+        });
+      });
+
+      it('should handle response with value wrapper', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Wrapped',
+          content: '# Wrapped\n\nWrapped content.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'wrapped123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: {
+              id: 7,
+              path: '/Wrapped',
+              version: 'wrapped123',
+              isParentPage: false,
+              order: 0,
+              gitItemPath: '/Wrapped.md'
+            }
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        const result = await client.updatePage(mockRequest);
+
+        expect(result).toEqual({
+          id: '7',
+          path: '/Wrapped',
+          title: 'Wrapped',
+          version: 'wrapped123',
+          isParentPage: false,
+          order: 0,
+          gitItemPath: '/Wrapped.md'
+        });
+      });
+    });
+
+    describe('error scenarios', () => {
+      it('should throw error when client is not initialized', async () => {
+        const uninitializedClient = new AzureDevOpsWikiClient(mockConfig);
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        await expect(uninitializedClient.updatePage(mockRequest)).rejects.toThrow(
+          'Azure DevOps client not initialized'
+        );
+      });
+
+      it('should throw error when organization is missing', async () => {
+        const clientWithoutOrg = new AzureDevOpsWikiClient({
+          organization: '',
+          project: 'testproject',
+          personalAccessToken: 'test-token'
+        });
+        await clientWithoutOrg.initialize();
+
+        const mockRequest: WikiUpdatePageRequest = {
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        await expect(clientWithoutOrg.updatePage(mockRequest)).rejects.toThrow(
+          'Organization and project must be provided'
+        );
+      });
+
+      it('should throw error when project is missing', async () => {
+        const clientWithoutProject = new AzureDevOpsWikiClient({
+          organization: 'testorg',
+          project: '',
+          personalAccessToken: 'test-token'
+        });
+        await clientWithoutProject.initialize();
+
+        const mockRequest: WikiUpdatePageRequest = {
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        await expect(clientWithoutProject.updatePage(mockRequest)).rejects.toThrow(
+          'Organization and project must be provided'
+        );
+      });
+
+      it('should throw error when wiki API fails to get wiki', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        mockWikiApi.getWiki.mockRejectedValue(new Error('Wiki not found'));
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Failed to update page: Wiki not found'
+        );
+      });
+
+      it('should throw error when page update fails with 400 status', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { 
+            statusCode: 200,
+            headers: { etag: 'test123' }
+          }
+        };
+
+        const mockUpdateResponse = {
+          message: { 
+            statusCode: 400,
+            statusMessage: 'Bad Request'
+          },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockUpdateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Failed to update page: HTTP 400'
+        );
+      });
+
+      it('should throw error when page creation fails with 409 status', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Conflict',
+          content: '# Conflict\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 409,
+            statusMessage: 'Conflict'
+          },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Failed to create page: HTTP 409'
+        );
+      });
+
+      it('should throw error when response body is empty', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'empty123' }
+          },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Empty response body'
+        );
+      });
+
+      it('should throw error when JSON parsing fails', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'json123' }
+          },
+          readBody: jest.fn().mockResolvedValue('invalid json')
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Failed to update page:'
+        );
+      });
+
+      it('should throw error when page data is null', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Null',
+          content: '# Null\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'null123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: null
+          }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Failed to create page: /Null'
+        );
+      });
+
+      it('should throw error when page data is undefined', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Undefined',
+          content: '# Undefined\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          message: { 
+            statusCode: 201,
+            headers: { etag: 'undefined123' }
+          },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({ value: null }))
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Failed to create page: /Undefined'
+        );
+      });
+
+      it('should handle missing message in response', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home',
+          content: '# Home\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { statusCode: 404 }
+        };
+
+        const mockCreateResponse = {
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockCreateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow(
+          'Failed to create page: HTTP Unknown'
+        );
+      });
+
+      it('should include detailed error information in error message', async () => {
+        const mockRequest: WikiUpdatePageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Debug',
+          content: '# Debug\n\nContent.'
+        };
+
+        const mockWiki = {
+          url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123'
+        };
+
+        const mockCheckResponse = {
+          message: { 
+            statusCode: 200,
+            headers: { etag: 'debug123' }
+          }
+        };
+
+        const mockUpdateResponse = {
+          message: { 
+            statusCode: 500,
+            statusMessage: 'Internal Server Error',
+            headers: { 'content-type': 'application/json' }
+          },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockWikiApi.getWiki.mockResolvedValue(mockWiki);
+        mockHttpClient.get.mockResolvedValue(mockCheckResponse);
+        mockHttpClient.put.mockResolvedValue(mockUpdateResponse);
+
+        await expect(client.updatePage(mockRequest)).rejects.toThrow();
       });
     });
   });

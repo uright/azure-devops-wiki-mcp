@@ -71,24 +71,22 @@ describe('Request Schema Validation', () => {
         project: 'myproject',
         wikiId: 'wiki123',
         path: '/some/page',
-        content: '# Updated content',
-        version: 'v1.0'
+        content: '# Updated content'
       };
       
       expect(() => WikiUpdatePageRequestSchema.parse(validRequest)).not.toThrow();
     });
 
-    it('should reject empty version', () => {
-      const invalidRequest = {
+    it('should allow empty content', () => {
+      const validRequest = {
         organization: 'myorg',
         project: 'myproject',
         wikiId: 'wiki123',
         path: '/some/page',
-        content: '# Updated content',
-        version: ''
+        content: ''
       };
       
-      expect(() => WikiUpdatePageRequestSchema.parse(invalidRequest)).toThrow();
+      expect(() => WikiUpdatePageRequestSchema.parse(validRequest)).not.toThrow();
     });
   });
 });
