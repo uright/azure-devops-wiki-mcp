@@ -1,29 +1,29 @@
 import { z } from 'zod';
 
 export const WikiSearchRequestSchema = z.object({
-  organization: z.string().min(1),
-  project: z.string().min(1),
+  organization: z.string().min(1).optional(),
+  project: z.string().min(1).optional(),
   searchText: z.string().min(1),
   wikiId: z.string().optional(),
 });
 
 export const WikiPageTreeRequestSchema = z.object({
-  organization: z.string().min(1),
-  project: z.string().min(1),
+  organization: z.string().min(1).optional(),
+  project: z.string().min(1).optional(),
   wikiId: z.string().min(1),
   depth: z.number().int().positive().optional(),
 });
 
 export const WikiGetPageRequestSchema = z.object({
-  organization: z.string().min(1),
-  project: z.string().min(1),
+  organization: z.string().min(1).optional(),
+  project: z.string().min(1).optional(),
   wikiId: z.string().min(1),
   path: z.string().min(1),
 });
 
 export const WikiUpdatePageRequestSchema = z.object({
-  organization: z.string().min(1),
-  project: z.string().min(1),
+  organization: z.string().min(1).optional(),
+  project: z.string().min(1).optional(),
   wikiId: z.string().min(1),
   path: z.string().min(1),
   content: z.string(),
@@ -84,6 +84,7 @@ export const EnvironmentConfigSchema = z.object({
   AZURE_DEVOPS_URL: z.string().url().optional(),
   AZURE_DEVOPS_PROJECT: z.string().min(1).optional(),
   AZURE_DEVOPS_PAT: z.string().min(1).optional(),
+  AZURE_DEVOPS_ORGANIZATION: z.string().min(1).optional(),
 });
 
 export type EnvironmentConfig = z.infer<typeof EnvironmentConfigSchema>;
@@ -91,5 +92,6 @@ export type EnvironmentConfig = z.infer<typeof EnvironmentConfigSchema>;
 export interface ServerConfig {
   azureDevOpsUrl?: string;
   defaultProject?: string;
+  defaultOrganization?: string;
   personalAccessToken?: string;
 }

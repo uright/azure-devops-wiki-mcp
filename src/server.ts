@@ -49,7 +49,7 @@ export class AzureDevOpsWikiServer {
                   description: 'Optional specific wiki identifier'
                 }
               },
-              required: ['organization', 'project', 'searchText']
+              required: ['searchText']
             }
           },
           {
@@ -75,7 +75,7 @@ export class AzureDevOpsWikiServer {
                   description: 'Optional maximum depth to retrieve'
                 }
               },
-              required: ['organization', 'project', 'wikiId']
+              required: ['wikiId']
             }
           },
           {
@@ -101,7 +101,7 @@ export class AzureDevOpsWikiServer {
                   description: 'Page path or page ID'
                 }
               },
-              required: ['organization', 'project', 'wikiId', 'path']
+              required: ['wikiId', 'path']
             }
           },
           {
@@ -135,7 +135,7 @@ export class AzureDevOpsWikiServer {
                   description: 'Page version for concurrency control'
                 }
               },
-              required: ['organization', 'project', 'wikiId', 'path', 'content', 'version']
+              required: ['wikiId', 'path', 'content', 'version']
             }
           }
         ] as Tool[]
@@ -176,6 +176,7 @@ export class AzureDevOpsWikiServer {
       return {
         azureDevOpsUrl: envConfig.AZURE_DEVOPS_URL,
         defaultProject: envConfig.AZURE_DEVOPS_PROJECT,
+        defaultOrganization: envConfig.AZURE_DEVOPS_ORGANIZATION,
         personalAccessToken: envConfig.AZURE_DEVOPS_PAT
       };
     } catch (error) {
@@ -201,7 +202,17 @@ export class AzureDevOpsWikiServer {
 
   private async handleSearchWiki(args: any) {
     const request = WikiSearchRequestSchema.parse(args);
-    const client = await this.getClient(request.organization, request.project);
+    const organization = request.organization || this.config.defaultOrganization;
+    const project = request.project || this.config.defaultProject;
+    
+    if (!organization) {
+      throw new Error('Organization is required either as parameter or in server configuration');
+    }
+    if (!project) {
+      throw new Error('Project is required either as parameter or in server configuration');
+    }
+    
+    const client = await this.getClient(organization, project);
     const results = await client.searchWiki(request);
     
     return {
@@ -214,7 +225,17 @@ export class AzureDevOpsWikiServer {
 
   private async handleGetPageTree(args: any) {
     const request = WikiPageTreeRequestSchema.parse(args);
-    const client = await this.getClient(request.organization, request.project);
+    const organization = request.organization || this.config.defaultOrganization;
+    const project = request.project || this.config.defaultProject;
+    
+    if (!organization) {
+      throw new Error('Organization is required either as parameter or in server configuration');
+    }
+    if (!project) {
+      throw new Error('Project is required either as parameter or in server configuration');
+    }
+    
+    const client = await this.getClient(organization, project);
     const tree = await client.getPageTree(request);
     
     return {
@@ -227,7 +248,17 @@ export class AzureDevOpsWikiServer {
 
   private async handleGetPage(args: any) {
     const request = WikiGetPageRequestSchema.parse(args);
-    const client = await this.getClient(request.organization, request.project);
+    const organization = request.organization || this.config.defaultOrganization;
+    const project = request.project || this.config.defaultProject;
+    
+    if (!organization) {
+      throw new Error('Organization is required either as parameter or in server configuration');
+    }
+    if (!project) {
+      throw new Error('Project is required either as parameter or in server configuration');
+    }
+    
+    const client = await this.getClient(organization, project);
     const page = await client.getPage(request);
     
     return {
@@ -240,7 +271,17 @@ export class AzureDevOpsWikiServer {
 
   private async handleUpdatePage(args: any) {
     const request = WikiUpdatePageRequestSchema.parse(args);
-    const client = await this.getClient(request.organization, request.project);
+    const organization = request.organization || this.config.defaultOrganization;
+    const project = request.project || this.config.defaultProject;
+    
+    if (!organization) {
+      throw new Error('Organization is required either as parameter or in server configuration');
+    }
+    if (!project) {
+      throw new Error('Project is required either as parameter or in server configuration');
+    }
+    
+    const client = await this.getClient(organization, project);
     const result = await client.updatePage(request);
     
     return {
