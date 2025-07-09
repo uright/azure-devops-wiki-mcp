@@ -1,5 +1,5 @@
 import { AzureDevOpsWikiClient } from '../src/azure-client';
-import { WikiPageTreeRequest } from '../src/types';
+import { WikiPageTreeRequest, WikiGetPageRequest } from '../src/types';
 import * as azdev from 'azure-devops-node-api';
 import { WikiApi } from 'azure-devops-node-api/WikiApi';
 import { DefaultAzureCredential } from '@azure/identity';
@@ -474,6 +474,433 @@ describe('AzureDevOpsWikiClient', () => {
         const result = await client.getPageTree(mockRequest);
 
         expect(result).toEqual([]);
+      });
+    });
+  });
+
+  describe('getPage', () => {
+    beforeEach(async () => {
+      await client.initialize();
+    });
+
+    describe('success scenarios', () => {
+      it('should return page content for a simple page', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: [
+              {
+                id: 1,
+                path: '/Home',
+                content: '# Welcome to our Wiki\n\nThis is the home page.',
+                gitItemPath: '/Home.md',
+                order: 1,
+                version: 'abc123',
+                isParentPage: false
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        const result = await client.getPage(mockRequest);
+
+        expect(result).toEqual({
+          id: '1',
+          path: '/Home',
+          title: 'Home',
+          content: '# Welcome to our Wiki\n\nThis is the home page.',
+          gitItemPath: '/Home.md',
+          order: 1,
+          version: 'abc123',
+          isParentPage: false
+        });
+      });
+
+      it('should handle direct page response format (not wrapped in value array)', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Getting-Started'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            id: 2,
+            path: '/Getting-Started',
+            content: '# Getting Started\n\nFollow these steps...',
+            gitItemPath: '/Getting-Started.md',
+            order: 2,
+            version: 'def456',
+            isParentPage: true
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        const result = await client.getPage(mockRequest);
+
+        expect(result).toEqual({
+          id: '2',
+          path: '/Getting-Started',
+          title: 'Getting-Started',
+          content: '# Getting Started\n\nFollow these steps...',
+          gitItemPath: '/Getting-Started.md',
+          order: 2,
+          version: 'def456',
+          isParentPage: true
+        });
+      });
+
+      it('should handle nested page paths correctly', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Documentation/API/Authentication'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: [
+              {
+                id: 10,
+                path: '/Documentation/API/Authentication',
+                content: '# Authentication\n\nAuthentication is required...',
+                gitItemPath: '/Documentation/API/Authentication.md',
+                order: 3,
+                version: 'ghi789',
+                isParentPage: false
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        const result = await client.getPage(mockRequest);
+
+        expect(result.title).toBe('Authentication');
+        expect(result.path).toBe('/Documentation/API/Authentication');
+        expect(result.content).toBe('# Authentication\n\nAuthentication is required...');
+      });
+
+      it('should use fallback values for missing properties', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Minimal-Page'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: [
+              {
+                path: '/Minimal-Page'
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        const result = await client.getPage(mockRequest);
+
+        expect(result).toEqual({
+          id: '',
+          path: '/Minimal-Page',
+          title: 'Minimal-Page',
+          content: '',
+          gitItemPath: '',
+          order: 0,
+          version: '',
+          isParentPage: false
+        });
+      });
+
+      it('should use config organization/project when not provided in request', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: [
+              {
+                id: 1,
+                path: '/Home',
+                content: 'Content here'
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await client.getPage(mockRequest);
+
+        expect(mockRestClient.get).toHaveBeenCalledWith(
+          expect.stringContaining('https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki123/pages')
+        );
+      });
+
+      it('should properly encode the path parameter', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Special Page with Spaces & Symbols'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: [
+              {
+                id: 5,
+                path: '/Special Page with Spaces & Symbols',
+                content: 'Special content'
+              }
+            ]
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await client.getPage(mockRequest);
+
+        expect(mockRestClient.get).toHaveBeenCalledWith(
+          expect.stringContaining('path=%2FSpecial%20Page%20with%20Spaces%20%26%20Symbols')
+        );
+      });
+
+      it('should include includeContent=true in API call', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: [{ id: 1, path: '/Home', content: 'Content' }]
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await client.getPage(mockRequest);
+
+        expect(mockRestClient.get).toHaveBeenCalledWith(
+          expect.stringContaining('includeContent=true')
+        );
+      });
+    });
+
+    describe('error scenarios', () => {
+      it('should throw error when client is not initialized', async () => {
+        const uninitializedClient = new AzureDevOpsWikiClient(mockConfig);
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        await expect(uninitializedClient.getPage(mockRequest)).rejects.toThrow(
+          'Azure DevOps client not initialized'
+        );
+      });
+
+      it('should throw error when organization is missing', async () => {
+        const clientWithoutOrg = new AzureDevOpsWikiClient({
+          organization: '',
+          project: 'testproject',
+          personalAccessToken: 'test-token'
+        });
+        await clientWithoutOrg.initialize();
+
+        const mockRequest: WikiGetPageRequest = {
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        await expect(clientWithoutOrg.getPage(mockRequest)).rejects.toThrow(
+          'Organization and project must be provided'
+        );
+      });
+
+      it('should throw error when project is missing', async () => {
+        const clientWithoutProject = new AzureDevOpsWikiClient({
+          organization: 'testorg',
+          project: '',
+          personalAccessToken: 'test-token'
+        });
+        await clientWithoutProject.initialize();
+
+        const mockRequest: WikiGetPageRequest = {
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        await expect(clientWithoutProject.getPage(mockRequest)).rejects.toThrow(
+          'Organization and project must be provided'
+        );
+      });
+
+      it('should throw error when API returns non-200 status', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/NonExistent'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 404 },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await expect(client.getPage(mockRequest)).rejects.toThrow(
+          'Failed to get page: HTTP 404'
+        );
+      });
+
+      it('should throw error when response body is empty', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await expect(client.getPage(mockRequest)).rejects.toThrow(
+          'Empty response body'
+        );
+      });
+
+      it('should throw error when page is not found in response', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Missing'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: []
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await expect(client.getPage(mockRequest)).rejects.toThrow(
+          'Page not found: /Missing'
+        );
+      });
+
+      it('should throw error when page data is null', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Null'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue(JSON.stringify({
+            value: [null]
+          }))
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await expect(client.getPage(mockRequest)).rejects.toThrow(
+          'Page not found: /Null'
+        );
+      });
+
+      it('should throw error when API request fails', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        mockRestClient.get.mockRejectedValue(new Error('Network error'));
+
+        await expect(client.getPage(mockRequest)).rejects.toThrow(
+          'Failed to get page: Network error'
+        );
+      });
+
+      it('should throw error when JSON parsing fails', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        const mockResponse = {
+          message: { statusCode: 200 },
+          readBody: jest.fn().mockResolvedValue('invalid json')
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await expect(client.getPage(mockRequest)).rejects.toThrow(
+          'Failed to get page:'
+        );
+      });
+
+      it('should handle missing message in response', async () => {
+        const mockRequest: WikiGetPageRequest = {
+          organization: 'testorg',
+          project: 'testproject',
+          wikiId: 'wiki123',
+          path: '/Home'
+        };
+
+        const mockResponse = {
+          readBody: jest.fn().mockResolvedValue('')
+        };
+
+        mockRestClient.get.mockResolvedValue(mockResponse);
+
+        await expect(client.getPage(mockRequest)).rejects.toThrow(
+          'Failed to get page: HTTP Unknown'
+        );
       });
     });
   });

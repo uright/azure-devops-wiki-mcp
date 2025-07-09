@@ -140,9 +140,15 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
   - Handles hierarchical page structures with proper sorting by order
   - Comprehensive unit test coverage with success/error scenarios
 
+- **`wiki_get_page`**: ✅ Fully implemented using Azure DevOps REST API
+  - Uses direct HTTP client calls to `/pages` endpoint with path parameter and includeContent=true
+  - Handles both array and direct response formats from the API
+  - Proper URL encoding for page paths with special characters
+  - Comprehensive error handling for missing pages, network failures, and malformed responses
+  - Comprehensive unit test coverage with success/error scenarios
+
 ### Methods Requiring Implementation
 - **`search_wiki`**: ❌ Requires proper Search API integration
-- **`wiki_get_page`**: ❌ Needs correct page content retrieval method
 - **`wiki_update_page`**: ❌ Requires proper page update method implementation
 
 ### Implementation Notes
