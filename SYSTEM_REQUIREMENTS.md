@@ -6,11 +6,12 @@
 The Azure DevOps Wiki MCP Server is a Model Context Protocol (MCP) server that provides seamless integration between AI applications and Azure DevOps Wiki API. This server enables AI models to interact with Azure DevOps wikis through standardized MCP tools.
 
 ### 1.2 Scope
-This system provides four core functionalities:
+This system provides five core functionalities:
 - Search across wiki content
 - Retrieve wiki page hierarchies
 - Get individual wiki page content
 - Update wiki page content
+- List all wikis in a project
 
 ### 1.3 Reference Architecture
 The project follows the established patterns from the microsoft/azure-devops-mcp project, ensuring consistency with existing Azure DevOps MCP implementations.
@@ -22,7 +23,7 @@ The project follows the established patterns from the microsoft/azure-devops-mcp
 - **Language**: TypeScript
 - **Protocol**: Model Context Protocol (MCP)
 - **API Integration**: Azure DevOps REST API v7.1
-- **Authentication**: Azure CLI-based authentication
+- **Authentication**: Azure CLI-based authentication (primary), Personal Access Token (secondary)
 
 ### 2.2 Core Dependencies
 - `@modelcontextprotocol/sdk`: MCP protocol implementation
@@ -82,10 +83,34 @@ The project follows the established patterns from the microsoft/azure-devops-mcp
 
 **Output**: Updated page information and new version details
 
+#### 3.1.5 list_wiki
+**Purpose**: List all wikis in a project
+**Input Parameters**:
+- `organization` (optional): Azure DevOps organization name
+- `project` (optional): Project name
+
+**Output**: Array of wiki information including id, name, type, url, project, repositoryId, and mappedPath
+
 ### 3.2 Authentication Requirements
-- Azure CLI authentication (`az login`)
-- Appropriate Azure DevOps permissions for target organization
-- Wiki read/write permissions based on tool operations
+
+The server supports two authentication methods:
+
+#### 3.2.1 Azure CLI Authentication (Default)
+- User must be logged in via `az login`
+- Must have appropriate permissions for target Azure DevOps organization
+- Wiki access permissions required for read/write operations
+
+#### 3.2.2 Personal Access Token (PAT)
+Environment variables for PAT authentication:
+- `AZURE_DEVOPS_URL`: Azure DevOps organization URL (optional)
+- `AZURE_DEVOPS_PROJECT`: Default project name (optional)
+- `AZURE_DEVOPS_PAT`: Personal Access Token (optional)
+
+PAT requires the following scopes:
+- **Wiki**: Read & Write
+- **Project and Team**: Read (for project access)
+
+Authentication priority: PAT takes precedence over Azure CLI credentials when both are available.
 
 ## 4. Non-Functional Requirements
 
@@ -154,17 +179,14 @@ azure-devops-wiki-mcp/
 ├── src/
 │   ├── index.ts              # Main server entry point
 │   ├── server.ts             # MCP server implementation
-│   ├── tools/                # Tool implementations
-│   │   ├── search-wiki.ts
-│   │   ├── get-page-tree.ts
-│   │   ├── get-page.ts
-│   │   └── update-page.ts
 │   ├── azure-client.ts       # Azure DevOps API client
 │   └── types.ts              # Type definitions
 ├── test/                     # Test files
 ├── docs/                     # Documentation
 └── dist/                     # Compiled output
 ```
+
+**Note**: The current implementation uses a consolidated server architecture rather than separate tool files.
 
 ### 6.2 Error Handling Strategy
 - Validation errors: Return structured error responses with clear messages
@@ -198,6 +220,8 @@ azure-devops-wiki-mcp/
 - Wiki attachment handling
 - Advanced search filters
 - Page history and version management
+- Wiki clone and template operations
+- Integration with Azure DevOps pull requests for wiki changes
 
 ### 8.2 Integration Possibilities
 - VS Code extension integration
