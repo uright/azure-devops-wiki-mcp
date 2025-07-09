@@ -108,7 +108,6 @@ Update content of an existing wiki page.
 - `wikiId` (required): Wiki identifier
 - `path` (required): Page path or page ID
 - `content` (required): New page content (Markdown)
-- `version` (required): Page version for concurrency control
 
 ## Authentication
 

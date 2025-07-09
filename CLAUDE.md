@@ -147,9 +147,14 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
   - Comprehensive error handling for missing pages, network failures, and malformed responses
   - Comprehensive unit test coverage with success/error scenarios
 
+- **`wiki_update_page`**: ✅ Fully implemented using Azure DevOps REST API
+  - Uses direct HTTP client calls to `/pages` endpoint with PUT method for page updates
+  - Handles version-based conflict resolution with proper ETag handling
+  - Comprehensive error handling for version conflicts, missing pages, and malformed responses
+  - Comprehensive unit test coverage with success/error scenarios
+
 ### Methods Requiring Implementation
 - **`search_wiki`**: ❌ Requires proper Search API integration
-- **`wiki_update_page`**: ❌ Requires proper page update method implementation
 
 ### Implementation Notes
 - `wiki_get_page_tree` bypasses azure-devops-node-api limitations by using direct REST calls
