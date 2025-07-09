@@ -7,10 +7,12 @@ import {
   WikiPageTreeRequest, 
   WikiGetPageRequest, 
   WikiUpdatePageRequest,
+  WikiListRequest,
   WikiSearchResult,
   WikiPageNode,
   WikiPageContent,
   WikiPageUpdateResult,
+  WikiInfo,
   AzureDevOpsConfig 
 } from './types.js';
 
@@ -385,6 +387,40 @@ export class AzureDevOpsWikiClient {
       };
     } catch (error) {
       throw new Error(`Failed to update page: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async listWikis(request: WikiListRequest): Promise<WikiInfo[]> {
+    if (!this.wikiApi || !this.connection) {
+      throw new Error('Azure DevOps client not initialized');
+    }
+
+    try {
+      const organization = request.organization || this.config.organization;
+      const project = request.project || this.config.project;
+      
+      if (!organization || !project) {
+        throw new Error('Organization and project must be provided');
+      }
+
+      const wikis = await this.wikiApi.getAllWikis(project);
+      
+      if (!wikis || !Array.isArray(wikis)) {
+        return [];
+      }
+
+      return wikis.map(wiki => ({
+        id: wiki.id || '',
+        name: wiki.name || '',
+        type: wiki.type?.toString() || '',
+        url: wiki.url || '',
+        project: project,
+        repositoryId: wiki.repositoryId || '',
+        mappedPath: wiki.mappedPath || ''
+      }));
+
+    } catch (error) {
+      throw new Error(`Failed to list wikis: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

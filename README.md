@@ -8,6 +8,7 @@ A Model Context Protocol (MCP) server that provides integration with Azure DevOp
 - **wiki_get_page_tree**: Retrieve hierarchical page structure from wiki
 - **wiki_get_page**: Get content of a specific wiki page
 - **wiki_update_page**: Update content of an existing wiki page
+- **list_wiki**: List all wikis in a project
 
 ## Installation
 
@@ -108,6 +109,16 @@ Update content of an existing wiki page.
 - `wikiId` (required): Wiki identifier
 - `path` (required): Page path or page ID
 - `content` (required): New page content (Markdown)
+
+### list_wiki
+
+List all wikis in a project.
+
+**Parameters:**
+- `organization` (optional): Azure DevOps organization name
+- `project` (optional): Project name
+
+**Note:** Both parameters are optional and will use environment defaults if not provided.
 
 ## Authentication
 

@@ -33,17 +33,18 @@ npm run clean
 ### MCP Server Structure
 - **Entry Point**: Main server that implements MCP protocol using `@modelcontextprotocol/sdk`
 - **Azure DevOps Client**: Wrapper around `azure-devops-node-api` for Wiki API operations
-- **Tool Handlers**: Four main tools implementing MCP tool interface
+- **Tool Handlers**: Five main tools implementing MCP tool interface
 - **Authentication**: Azure CLI-based authentication following azure-devops-mcp patterns
 
 ### Core Tools Implementation
 
-The server provides four main tools:
+The server provides five main tools:
 
 1. **search_wiki**: Search across wiki content using Azure DevOps Search API
 2. **wiki_get_page_tree**: Retrieve hierarchical page structure from wiki
 3. **wiki_get_page**: Get content of a specific wiki page
 4. **wiki_update_page**: Update content of an existing wiki page
+5. **list_wiki**: List all wikis in a project
 
 ### Azure DevOps Wiki API Integration
 
@@ -111,6 +112,11 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
 **Parameters**: organization, project, wikiId, path, content, version
 **Output**: Updated page information and new version details
 
+### list_wiki
+**Purpose**: List all wikis in a project
+**Parameters**: organization (optional), project (optional)
+**Output**: Array of wiki information including id, name, type, url, project, repositoryId, and mappedPath
+
 ## Implementation Architecture
 
 ### Data Flow
@@ -153,7 +159,6 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
   - Comprehensive error handling for version conflicts, missing pages, and malformed responses
   - Comprehensive unit test coverage with success/error scenarios
 
-### Methods Requiring Implementation
 - **`search_wiki`**: ✅ Fully implemented using Azure DevOps Search API
   - Uses direct HTTP client calls to `/search/wikisearchresults` endpoint
   - Handles search queries with optional wiki filtering
@@ -161,9 +166,17 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
   - Comprehensive error handling for API failures and malformed responses
   - Comprehensive unit test coverage with success/error scenarios
 
+- **`list_wiki`**: ✅ Fully implemented using Azure DevOps Wiki API
+  - Uses `wikiApi.getAllWikis()` method to retrieve all wikis in a project
+  - Handles optional organization and project parameters with environment defaults
+  - Returns structured wiki information including id, name, type, url, project, repositoryId, and mappedPath
+  - Comprehensive error handling for API failures and missing configuration
+  - Comprehensive unit test coverage with success/error scenarios
+
 ### Implementation Notes
 - `wiki_get_page_tree` bypasses azure-devops-node-api limitations by using direct REST calls
 - `search_wiki` uses the Azure DevOps Search API with direct REST calls for better control
+- `list_wiki` uses the standard azure-devops-node-api WikiApi.getAllWikis() method
 - All implemented methods include comprehensive error handling and type safety
 - Consistent title extraction logic across all methods using `path.split('/').pop()`
 

@@ -10,6 +10,7 @@ import {
   WikiPageTreeRequestSchema, 
   WikiGetPageRequestSchema, 
   WikiUpdatePageRequestSchema,
+  WikiListRequestSchema,
   EnvironmentConfigSchema,
   ServerConfig
 } from './types.js';
@@ -133,6 +134,24 @@ export class AzureDevOpsWikiServer {
               },
               required: ['wikiId', 'path', 'content']
             }
+          },
+          {
+            name: 'list_wiki',
+            description: 'List all wikis in a project',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                organization: {
+                  type: 'string',
+                  description: 'Azure DevOps organization name'
+                },
+                project: {
+                  type: 'string',
+                  description: 'Project name'
+                }
+              },
+              required: []
+            }
           }
         ] as Tool[]
       };
@@ -151,6 +170,8 @@ export class AzureDevOpsWikiServer {
             return await this.handleGetPage(args);
           case 'wiki_update_page':
             return await this.handleUpdatePage(args);
+          case 'list_wiki':
+            return await this.handleListWiki(args);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -284,6 +305,29 @@ export class AzureDevOpsWikiServer {
       content: [{
         type: 'text',
         text: JSON.stringify(result, null, 2)
+      }]
+    };
+  }
+
+  private async handleListWiki(args: any) {
+    const request = WikiListRequestSchema.parse(args);
+    const organization = request.organization || this.config.defaultOrganization;
+    const project = request.project || this.config.defaultProject;
+    
+    if (!organization) {
+      throw new Error('Organization is required either as parameter or in server configuration');
+    }
+    if (!project) {
+      throw new Error('Project is required either as parameter or in server configuration');
+    }
+    
+    const client = await this.getClient(organization, project);
+    const wikis = await client.listWikis(request);
+    
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(wikis, null, 2)
       }]
     };
   }

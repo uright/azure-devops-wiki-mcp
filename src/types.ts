@@ -29,10 +29,16 @@ export const WikiUpdatePageRequestSchema = z.object({
   content: z.string(),
 });
 
+export const WikiListRequestSchema = z.object({
+  organization: z.string().min(1).optional(),
+  project: z.string().min(1).optional(),
+});
+
 export type WikiSearchRequest = z.infer<typeof WikiSearchRequestSchema>;
 export type WikiPageTreeRequest = z.infer<typeof WikiPageTreeRequestSchema>;
 export type WikiGetPageRequest = z.infer<typeof WikiGetPageRequestSchema>;
 export type WikiUpdatePageRequest = z.infer<typeof WikiUpdatePageRequestSchema>;
+export type WikiListRequest = z.infer<typeof WikiListRequestSchema>;
 
 export interface WikiSearchResult {
   title: string;
@@ -71,6 +77,16 @@ export interface WikiPageUpdateResult {
   isParentPage: boolean;
   order: number;
   gitItemPath: string;
+}
+
+export interface WikiInfo {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  project: string;
+  repositoryId: string;
+  mappedPath: string;
 }
 
 export interface AzureDevOpsConfig {

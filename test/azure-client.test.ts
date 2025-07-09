@@ -1,5 +1,5 @@
 import { AzureDevOpsWikiClient } from '../src/azure-client';
-import { WikiPageTreeRequest, WikiGetPageRequest, WikiUpdatePageRequest, WikiSearchRequest } from '../src/types';
+import { WikiPageTreeRequest, WikiGetPageRequest, WikiUpdatePageRequest, WikiSearchRequest, WikiListRequest } from '../src/types';
 import * as azdev from 'azure-devops-node-api';
 import { WikiApi } from 'azure-devops-node-api/WikiApi';
 import { DefaultAzureCredential } from '@azure/identity';
@@ -41,6 +41,7 @@ describe('AzureDevOpsWikiClient', () => {
     mockWikiApi = {
       getPagesBatch: jest.fn(),
       getWiki: jest.fn(),
+      getAllWikis: jest.fn(),
       http: mockHttpClient
     } as any;
 
@@ -2048,6 +2049,190 @@ describe('AzureDevOpsWikiClient', () => {
         mockHttpClient.put.mockResolvedValue(mockUpdateResponse);
 
         await expect(client.updatePage(mockRequest)).rejects.toThrow();
+      });
+    });
+  });
+
+  describe('listWikis', () => {
+    beforeEach(async () => {
+      await client.initialize();
+    });
+
+    describe('success scenarios', () => {
+      it('should list all wikis successfully', async () => {
+        const mockRequest: WikiListRequest = {
+          organization: 'testorg',
+          project: 'testproject'
+        };
+
+        const mockWikis = [
+          {
+            id: 'wiki1',
+            name: 'Project Wiki',
+            type: 1, // WikiType.ProjectWiki
+            url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki1',
+            projectId: 'testproject',
+            repositoryId: 'repo1',
+            mappedPath: '/'
+          },
+          {
+            id: 'wiki2',
+            name: 'Code Wiki',
+            type: 2, // WikiType.CodeWiki
+            url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki2',
+            projectId: 'testproject',
+            repositoryId: 'repo2',
+            mappedPath: '/docs'
+          }
+        ];
+
+        mockWikiApi.getAllWikis.mockResolvedValue(mockWikis);
+
+        const result = await client.listWikis(mockRequest);
+
+        expect(result).toEqual([
+          {
+            id: 'wiki1',
+            name: 'Project Wiki',
+            type: '1',
+            url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki1',
+            project: 'testproject',
+            repositoryId: 'repo1',
+            mappedPath: '/'
+          },
+          {
+            id: 'wiki2',
+            name: 'Code Wiki',
+            type: '2',
+            url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki2',
+            project: 'testproject',
+            repositoryId: 'repo2',
+            mappedPath: '/docs'
+          }
+        ]);
+
+        expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith('testproject');
+      });
+
+      it('should handle empty wiki list', async () => {
+        const mockRequest: WikiListRequest = {
+          organization: 'testorg',
+          project: 'testproject'
+        };
+
+        mockWikiApi.getAllWikis.mockResolvedValue([]);
+
+        const result = await client.listWikis(mockRequest);
+
+        expect(result).toEqual([]);
+        expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith('testproject');
+      });
+
+      it('should use default organization and project from config', async () => {
+        const mockRequest: WikiListRequest = {};
+
+        const mockWikis = [
+          {
+            id: 'wiki1',
+            name: 'Default Wiki',
+            type: 1, // WikiType.ProjectWiki
+            url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki1',
+            projectId: 'testproject',
+            repositoryId: 'repo1',
+            mappedPath: '/'
+          }
+        ];
+
+        mockWikiApi.getAllWikis.mockResolvedValue(mockWikis);
+
+        const result = await client.listWikis(mockRequest);
+
+        expect(result).toEqual([
+          {
+            id: 'wiki1',
+            name: 'Default Wiki',
+            type: '1',
+            url: 'https://dev.azure.com/testorg/testproject/_apis/wiki/wikis/wiki1',
+            project: 'testproject',
+            repositoryId: 'repo1',
+            mappedPath: '/'
+          }
+        ]);
+
+        expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith('testproject');
+      });
+    });
+
+    describe('error scenarios', () => {
+      it('should throw error when not initialized', async () => {
+        const uninitializedClient = new AzureDevOpsWikiClient(mockConfig);
+        const mockRequest: WikiListRequest = {
+          organization: 'testorg',
+          project: 'testproject'
+        };
+
+        await expect(uninitializedClient.listWikis(mockRequest))
+          .rejects
+          .toThrow('Azure DevOps client not initialized');
+      });
+
+      it('should throw error when organization is missing', async () => {
+        const clientWithoutOrg = new AzureDevOpsWikiClient({
+          organization: '',
+          project: 'testproject'
+        });
+        await clientWithoutOrg.initialize();
+
+        const mockRequest: WikiListRequest = {
+          project: 'testproject'
+        };
+
+        await expect(clientWithoutOrg.listWikis(mockRequest))
+          .rejects
+          .toThrow('Organization and project must be provided');
+      });
+
+      it('should throw error when project is missing', async () => {
+        const clientWithoutProject = new AzureDevOpsWikiClient({
+          organization: 'testorg',
+          project: ''
+        });
+        await clientWithoutProject.initialize();
+
+        const mockRequest: WikiListRequest = {
+          organization: 'testorg'
+        };
+
+        await expect(clientWithoutProject.listWikis(mockRequest))
+          .rejects
+          .toThrow('Organization and project must be provided');
+      });
+
+      it('should throw error when API call fails', async () => {
+        const mockRequest: WikiListRequest = {
+          organization: 'testorg',
+          project: 'testproject'
+        };
+
+        mockWikiApi.getAllWikis.mockRejectedValue(new Error('API call failed'));
+
+        await expect(client.listWikis(mockRequest))
+          .rejects
+          .toThrow('Failed to list wikis: API call failed');
+      });
+
+      it('should handle null response from API', async () => {
+        const mockRequest: WikiListRequest = {
+          organization: 'testorg',
+          project: 'testproject'
+        };
+
+        mockWikiApi.getAllWikis.mockResolvedValue(null as any);
+
+        const result = await client.listWikis(mockRequest);
+
+        expect(result).toEqual([]);
+        expect(mockWikiApi.getAllWikis).toHaveBeenCalledWith('testproject');
       });
     });
   });
