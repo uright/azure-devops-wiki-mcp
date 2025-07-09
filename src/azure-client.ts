@@ -46,8 +46,68 @@ export class AzureDevOpsWikiClient {
     throw new Error('Search functionality not implemented yet - requires search API integration');
   }
 
-  async getPageTree(_request: WikiPageTreeRequest): Promise<WikiPageNode[]> {
-    throw new Error('Get page tree functionality not implemented yet - requires proper API method');
+  async getPageTree(request: WikiPageTreeRequest): Promise<WikiPageNode[]> {
+    if (!this.wikiApi || !this.connection) {
+      throw new Error('Azure DevOps client not initialized');
+    }
+
+    try {
+      const organization = request.organization || this.config.organization;
+      const project = request.project || this.config.project;
+      
+      if (!organization || !project) {
+        throw new Error('Organization and project must be provided');
+      }
+
+      const orgUrl = this.config.azureDevOpsUrl || `https://dev.azure.com/${organization}`;
+      const recursionLevel = request.depth ? 'Full' : 'OneLevel';
+      const apiUrl = `${orgUrl}/${project}/_apis/wiki/wikis/${request.wikiId}/pages?recursionLevel=${recursionLevel}&api-version=7.1`;
+
+      const response = await this.connection.rest.client.get(apiUrl);
+      
+      if (!response.message || response.message.statusCode !== 200) {
+        return [];
+      }
+
+      const responseBody = await response.readBody();
+      if (!responseBody) {
+        return [];
+      }
+
+      const data = JSON.parse(responseBody);
+      let pages = [];
+      if (data.value) {
+        pages = data.value;
+      } else if (data.subPages) {
+        pages = [data];
+      } else {
+        pages = [data];
+      }
+
+      const processPages = (pageList: unknown[]): WikiPageNode[] => {
+        return pageList.map((page: unknown) => {
+          const pageData = page as { 
+            id?: number; 
+            path?: string; 
+            order?: number; 
+            gitItemPath?: string; 
+            subPages?: unknown[] 
+          };
+          return {
+            id: pageData.id?.toString() || '',
+            path: pageData.path || '',
+            title: pageData.path ? pageData.path.split('/').pop() || '' : '',
+            order: pageData.order || 0,
+            gitItemPath: pageData.gitItemPath || '',
+            subPages: pageData.subPages ? processPages(pageData.subPages) : []
+          };
+        }).sort((a, b) => a.order - b.order);
+      };
+
+      return processPages(pages);
+    } catch (error) {
+      throw new Error(`Failed to get page tree: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async getPage(_request: WikiGetPageRequest): Promise<WikiPageContent> {
@@ -58,44 +118,4 @@ export class AzureDevOpsWikiClient {
     throw new Error('Update page functionality not implemented yet - requires proper API method');
   }
 
-  private buildPageTree(pages: any[]): WikiPageNode[] {
-    const pageMap = new Map<string, WikiPageNode>();
-    const rootPages: WikiPageNode[] = [];
-
-    pages.forEach(page => {
-      const node: WikiPageNode = {
-        id: page.id?.toString() || '',
-        path: page.path || '',
-        title: page.title || '',
-        order: page.order || 0,
-        gitItemPath: page.gitItemPath || '',
-        subPages: []
-      };
-      pageMap.set(node.id, node);
-    });
-
-    pages.forEach(page => {
-      const node = pageMap.get(page.id?.toString() || '');
-      if (!node) return;
-
-      if (page.parentId) {
-        const parent = pageMap.get(page.parentId.toString());
-        if (parent) {
-          parent.subPages = parent.subPages || [];
-          parent.subPages.push(node);
-        }
-      } else {
-        rootPages.push(node);
-      }
-    });
-
-    const sortPages = (pages: WikiPageNode[]): WikiPageNode[] => {
-      return pages.sort((a, b) => a.order - b.order).map(page => ({
-        ...page,
-        subPages: page.subPages ? sortPages(page.subPages) : []
-      }));
-    };
-
-    return sortPages(rootPages);
-  }
 }

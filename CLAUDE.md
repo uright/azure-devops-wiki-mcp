@@ -134,13 +134,22 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
 
 ## Current Implementation Status
 
-**Note**: Some Azure DevOps API methods are currently stubbed out in `src/azure-client.ts`:
-- `search_wiki`: Requires proper Search API integration
-- `wiki_get_page`: Needs correct `getPageByPath` method implementation
-- `wiki_update_page`: Requires proper `updatePageByPath` method implementation
-- `wiki_get_page_tree`: Needs correct `getPagesBatch` method implementation
+### Implemented Methods
+- **`wiki_get_page_tree`**: ✅ Fully implemented using Azure DevOps REST API
+  - Uses direct HTTP client calls to `/pages` endpoint with recursion level support
+  - Handles hierarchical page structures with proper sorting by order
+  - Comprehensive unit test coverage with success/error scenarios
 
-When implementing these methods, refer to the azure-devops-node-api documentation for correct method signatures and parameters.
+### Methods Requiring Implementation
+- **`search_wiki`**: ❌ Requires proper Search API integration
+- **`wiki_get_page`**: ❌ Needs correct page content retrieval method
+- **`wiki_update_page`**: ❌ Requires proper page update method implementation
+
+### Implementation Notes
+- `wiki_get_page_tree` bypasses azure-devops-node-api limitations by using direct REST calls
+- Future implementations should consider similar REST API approach for missing methods
+- All implemented methods include comprehensive error handling and type safety
+- When implementing remaining methods, refer to the azure-devops-node-api documentation and REST API specs
 
 ## Security Considerations
 
@@ -151,11 +160,31 @@ When implementing these methods, refer to the azure-devops-node-api documentatio
 
 ## Testing Strategy
 
-- Unit tests for individual tool implementations
-- Integration tests with mocked Azure DevOps API
-- Authentication flow testing
-- Error scenario validation
-- Current test coverage: Zod schema validation tests in `test/types.test.ts`
+### Current Test Coverage
+- **Schema validation tests** in `test/types.test.ts`: Validates Zod schemas for all request types
+- **Environment configuration tests** in `test/environment-config.test.ts`: Tests environment variable validation
+- **Azure client unit tests** in `test/azure-client.test.ts`: Comprehensive tests for AzureDevOpsWikiClient methods
+
+### Unit Testing Guidelines
+- **Mocking**: Use Jest mocks for external dependencies (azure-devops-node-api, @azure/identity)
+- **Test structure**: Follow AAA pattern (Arrange, Act, Assert)
+- **Coverage areas**:
+  - Success scenarios with various data structures
+  - Error scenarios (network failures, authentication issues, malformed responses)
+  - Edge cases (empty responses, missing properties, invalid configurations)
+  - Parameter validation and fallback behavior
+
+### Test Implementation Details
+- **Azure DevOps API mocking**: Mock WebApi, WikiApi, and REST client responses
+- **Authentication mocking**: Mock both PAT and Azure CLI authentication paths
+- **Response simulation**: Test with realistic Azure DevOps API response structures
+- **Error handling**: Verify proper error messages and exception handling
+
+### Running Tests
+```bash
+# Run all tests
+npm test
+```
 
 ## Key Implementation Notes
 
