@@ -25,6 +25,7 @@ npm install -g azure-devops-wiki-mcp
 
 ### With Claude Desktop
 
+#### For Global Installation
 Add to your `claude_desktop_config.json`:
 
 ```json
@@ -37,6 +38,27 @@ Add to your `claude_desktop_config.json`:
   }
 }
 ```
+
+#### For Local Development
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "azure-devops-wiki": {
+      "command": "node",
+      "args": ["/Users/jack/Projects/uright/azure-devops-wiki-mcp/dist/index.js"],
+      "env": {
+        "AZURE_DEVOPS_URL": "https://dev.azure.com/your-organization",
+        "AZURE_DEVOPS_PROJECT": "your-project",
+        "AZURE_DEVOPS_PAT": "your-pat-token"
+      }
+    }
+  }
+}
+```
+
+**Note**: Replace the path with your actual project path and update the environment variables with your Azure DevOps configuration.
 
 ### Direct Usage
 

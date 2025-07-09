@@ -10,7 +10,8 @@
       "Bash(npm install)",
       "Bash(npm run build:*)",
       "Bash(npm test)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
