@@ -14,7 +14,11 @@
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "release": "npm run build && npm run test && npm run lint"
   },
   "keywords": [
     "mcp",
@@ -26,6 +30,17 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uright/azure-devops-wiki-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/uright/azure-devops-wiki-mcp/issues"
+  },
+  "homepage": "https://github.com/uright/azure-devops-wiki-mcp#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
