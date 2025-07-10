@@ -299,6 +299,10 @@ export class AzureDevOpsWikiClient {
 
       // Get wiki object
       const wiki = await this.wikiApi.getWiki(request.wikiId, project);
+      // Fix: Access the first element of versions array safely and get its version property
+      const wikiVersion = Array.isArray(wiki.versions) && wiki.versions.length > 0
+        ? wiki.versions[0].version
+        : 'wikiMaster';
       
       // First, check if page exists to get version for updates
       let pageVersion: string | undefined;
@@ -332,7 +336,7 @@ export class AzureDevOpsWikiClient {
       };
 
       // TODO: Add versionDescriptor.versionType and versionDescriptor.version as optional environment variables
-      const apiUrl = `${wiki.url}/pages?path=${encodedPath}&api-version=7.1&versionDescriptor.versionType=branch&versionDescriptor.version=master`;
+      const apiUrl = `${wiki.url}/pages?path=${encodedPath}&api-version=7.1&versionDescriptor.versionType=branch&versionDescriptor.version=${wikiVersion}`;
       
       const response = await this.wikiApi.http.put(apiUrl, JSON.stringify(requestBody), headers);
       

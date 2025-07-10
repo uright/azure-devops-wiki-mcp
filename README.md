@@ -213,7 +213,14 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "azure-devops-wiki": {
       "command": "node",
-      "args": ["path/to/azure-devops-wiki-mcp/dist/index.js"],
+      "args": [
+        "--inspect",
+        "path/to/azure-devops-wiki-mcp/dist/index.js"
+      ],
+      "dev": {
+        "watch": "path/to/azure-devops-wiki-mcp/dist/*.js",
+        "debug": { "type": "node" }
+      },
       "env": {
         "AZURE_DEVOPS_URL": "https://dev.azure.com/your-organization",
         "AZURE_DEVOPS_PROJECT": "your-project",
