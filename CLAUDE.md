@@ -88,8 +88,6 @@ Environment variables for PAT authentication:
 - `AZURE_DEVOPS_PROJECT`: Default project name (optional)
 - `AZURE_DEVOPS_PAT`: Personal Access Token (optional)
 
-**Developer Setup**: Copy `example.env` to `.env` and configure with actual values
-
 PAT requires the following scopes:
 - **Wiki**: Read & Write
 - **Project and Team**: Read (for project access)
@@ -266,25 +264,6 @@ The project uses GitHub Actions for automated publishing:
    ```bash
    git push origin main --tags
    ```
-
-### Publishing Workflow
-
-The complete publishing workflow:
-
-```bash
-# 1. Ensure you're on main branch and up to date
-git checkout main
-git pull origin main
-
-# 2. Run pre-publish validation
-npm run release
-
-# 3. Bump version (creates commit + tag)
-npm run version:patch  # or minor/major
-
-# 4. Push to trigger automated publishing
-git push origin main --tags
-```
 
 ### CI/CD Pipeline
 

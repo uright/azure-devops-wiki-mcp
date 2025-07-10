@@ -7,7 +7,6 @@ A Model Context Protocol (MCP) server that brings Azure DevOps Wiki context to y
 - [🌟 Project Overview](#-project-overview)
 - [⚙️ Supported Tools](#️-supported-tools)
 - [🔌 Installation & Getting Started](#-installation--getting-started)
-- [🔦 Usage Instructions](#-usage-instructions)
 - [🔑 Authentication](#-authentication)
 - [🛠️ Development](#️-development)
 - [🏗️ Architecture](#️-architecture)
@@ -78,82 +77,59 @@ List all wikis in a project.
 ### Prerequisites
 
 - Node.js 18 or higher
-- Azure CLI installed and configured (`az login`)
+- Azure CLI installed and configured (`az login`) *Required only if you wish to authenticate with Azure, not required if you choose to use PAT token*
 - Appropriate Azure DevOps permissions for target organization
 
-### Installation
+### Configure in Claude Desktop using PAT authentication
 
-```bash
-npm install -g azure-devops-wiki-mcp
+Add to your `claude_desktop_config.json`:
+```json
+{
+    "mcpServers": {
+        "azure-devops-wiki": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "azure-devops-wiki-mcp"
+            ],
+            "env": {
+                "AZURE_DEVOPS_URL": "https://dev.azure.com/your-organization",
+                "AZURE_DEVOPS_PROJECT": "your-project",
+                "AZURE_DEVOPS_PAT": "your-pat-token",
+                "AZURE_DEVOPS_ORGANIZATION": "your-organization-name"
+            }
+        }
+    }
+}
 ```
 
-### Quick Start
+### Configure in Claude Desktop using Azure authentication
 
 1. **Authenticate with Azure:**
    ```bash
    az login
    ```
 
-2. **Install the package:**
-   ```bash
-   npm install -g azure-devops-wiki-mcp
-   ```
-
-3. **Configure with Claude Desktop:**
+2. **Configure with Claude Desktop:**
    Add to your `claude_desktop_config.json`:
    ```json
-   {
-     "mcpServers": {
-       "azure-devops-wiki": {
-         "command": "mcp-server-azure-devops-wiki",
-         "args": []
-       }
-     }
-   }
-   ```
-
-## 🔦 Usage Instructions
-
-### With Claude Desktop
-
-#### For Global Installation
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "azure-devops-wiki": {
-      "command": "mcp-server-azure-devops-wiki",
-      "args": []
+    {
+        "mcpServers": {
+            "azure-devops-wiki": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "azure-devops-wiki-mcp"
+                ],
+                "env": {
+                    "AZURE_DEVOPS_URL": "https://dev.azure.com/your-organization",
+                    "AZURE_DEVOPS_PROJECT": "your-project",
+                    "AZURE_DEVOPS_ORGANIZATION": "your-organization-name"
+                }
+            }
+        }
     }
-  }
-}
-```
-
-#### For Local Development
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "azure-devops-wiki": {
-      "command": "node",
-      "args": ["path/to/azure-devops-wiki-mcp/dist/index.js"],
-      "env": {
-        "AZURE_DEVOPS_URL": "https://dev.azure.com/your-organization",
-        "AZURE_DEVOPS_PROJECT": "your-project",
-        "AZURE_DEVOPS_PAT": "your-pat-token"
-      }
-    }
-  }
-}
-```
-
-### Direct Usage
-
-```bash
-mcp-server-azure-devops-wiki
-```
+    ```
 
 ## 🔑 Authentication
 
@@ -171,18 +147,7 @@ The server will use your Azure CLI credentials to authenticate with Azure DevOps
 
 ### 2. Personal Access Token (PAT)
 
-You can also use a Personal Access Token for authentication by setting environment variables:
-
-```bash
-export AZURE_DEVOPS_URL="https://dev.azure.com/your-organization"
-export AZURE_DEVOPS_PROJECT="your-default-project"
-export AZURE_DEVOPS_PAT="your-personal-access-token"
-```
-
-**Quick Setup:**
-1. Copy the example environment file: `cp example.env .env`
-2. Edit `.env` with your actual values
-3. Load the environment: `source .env` or use a tool like `dotenv`
+You can also use a Personal Access Token for authentication by setting environment variable `AZURE_DEVOPS_PAT`.
 
 **Creating a PAT:**
 1. Go to Azure DevOps → User Settings → Personal Access Tokens
@@ -192,9 +157,13 @@ export AZURE_DEVOPS_PAT="your-personal-access-token"
 3. Copy the token and set it in the `AZURE_DEVOPS_PAT` environment variable
 
 **Environment Variables:**
-- `AZURE_DEVOPS_URL`: Your Azure DevOps organization URL (optional)
-- `AZURE_DEVOPS_PROJECT`: Default project name (optional)
-- `AZURE_DEVOPS_PAT`: Personal Access Token (optional)
+
+| **Environment Variables** | **Description**                 | Required? |
+| ------------------------- | ------------------------------- | --------- |
+| AZURE_DEVOPS_URL          | Azure DevOps URL                | Yes       |
+| AZURE_DEVOPS_PROJECT      | Default project name (optional) | No        |
+| AZURE_DEVOPS_PAT          |                                 | No        |
+| AZURE_DEVOPS_ORGANIZATION | Azure DevOps Organization Name  | Yes       |
 
 When using PAT authentication, the server will prioritize the PAT over Azure CLI credentials.
 
@@ -234,6 +203,26 @@ npm run version:patch   # Bump patch version (1.0.0 → 1.0.1)
 npm run version:minor   # Bump minor version (1.0.0 → 1.1.0)
 npm run version:major   # Bump major version (1.0.0 → 2.0.0)
 npm run release         # Run build, test, and lint checks before publishing
+```
+
+### For Local Development
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "azure-devops-wiki": {
+      "command": "node",
+      "args": ["path/to/azure-devops-wiki-mcp/dist/index.js"],
+      "env": {
+        "AZURE_DEVOPS_URL": "https://dev.azure.com/your-organization",
+        "AZURE_DEVOPS_PROJECT": "your-project",
+        "AZURE_DEVOPS_PAT": "your-pat-token",
+        "AZURE_DEVOPS_ORGANIZATION": "your-organization-name"
+      }
+    }
+  }
+}
 ```
 
 ### Debug in IDE
@@ -281,47 +270,6 @@ Each version bump command automatically:
 1. Updates the version in `package.json`
 2. Creates a git commit with the version number
 3. Creates a git tag (e.g., `v1.0.1`)
-
-### Publishing to NPM
-
-The project uses GitHub Actions for automated publishing to npm:
-
-#### Prerequisites
-1. **NPM Account**: Create an account at [npmjs.com](https://www.npmjs.com/)
-2. **NPM Token**: Generate an automation token from your npm profile
-3. **GitHub Secret**: Add the `NPM_TOKEN` to your repository secrets
-
-#### Publishing Workflow
-
-```bash
-# 1. Ensure you're on main branch and up to date
-git checkout main
-git pull origin main
-
-# 2. Run pre-publish validation (optional but recommended)
-npm run release
-
-# 3. Bump version (creates commit + tag)
-npm run version:patch  # or minor/major based on your changes
-
-# 4. Push to trigger automated publishing
-git push origin main --tags
-```
-
-#### What Happens Next
-
-When you push version tags, the GitHub Actions workflow automatically:
-1. **Runs Tests**: Executes lint, test, and build on multiple Node.js versions
-2. **Publishes Package**: Uploads to npm registry if all tests pass
-3. **Makes Available**: Package becomes available via `npm install azure-devops-wiki-mcp`
-
-### CI/CD Pipeline
-
-The automated pipeline includes:
-- **Lint**: ESLint validation
-- **Test**: Jest tests on Node.js 18, 20, and 22
-- **Build**: TypeScript compilation
-- **Publish**: Automated npm publishing on version tags
 
 ## 🤝 Contributing
 
