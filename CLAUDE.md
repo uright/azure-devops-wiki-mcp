@@ -112,7 +112,7 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
 **Output**: Page content (Markdown), metadata, and version information
 
 ### wiki_update_page
-**Purpose**: Update content of an existing wiki page
+**Purpose**: Update content of an existing wiki page or create a new page if it does not exist
 **Parameters**: organization, project, wikiId, path, content, version
 **Output**: Updated page information and new version details
 
@@ -158,7 +158,8 @@ Authentication priority: PAT takes precedence over Azure CLI credentials when bo
   - Comprehensive unit test coverage with success/error scenarios
 
 - **`wiki_update_page`**: ✅ Fully implemented using Azure DevOps REST API
-  - Uses direct HTTP client calls to `/pages` endpoint with PUT method for page updates
+  - Uses direct HTTP client calls to `/pages` endpoint with PUT method for page updates and creation
+  - Creates new pages when they don't exist or updates existing pages
   - Handles version-based conflict resolution with proper ETag handling
   - Comprehensive error handling for version conflicts, missing pages, and malformed responses
   - Comprehensive unit test coverage with success/error scenarios

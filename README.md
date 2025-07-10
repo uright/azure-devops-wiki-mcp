@@ -54,7 +54,7 @@ Get content of a specific wiki page.
 - `path` (required): Page path or page ID
 
 ### ✏️ wiki_update_page
-Update content of an existing wiki page.
+Update content of an existing wiki page or create a new page if it does not exist.
 
 **Parameters:**
 - `organization` (required): Azure DevOps organization name

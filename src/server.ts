@@ -107,7 +107,7 @@ export class AzureDevOpsWikiServer {
           },
           {
             name: 'wiki_update_page',
-            description: 'Update content of an existing wiki page',
+            description: 'Update content of an existing wiki page or create a new page if it does not exist',
             inputSchema: {
               type: 'object',
               properties: {
