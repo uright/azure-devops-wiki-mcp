@@ -228,6 +228,12 @@ npm run lint
 
 # Clean build artifacts
 npm run clean
+
+# Version bump and publishing
+npm run version:patch   # Bump patch version (1.0.0 → 1.0.1)
+npm run version:minor   # Bump minor version (1.0.0 → 1.1.0)
+npm run version:major   # Bump major version (1.0.0 → 2.0.0)
+npm run release         # Run build, test, and lint checks before publishing
 ```
 
 ### Debug in IDE
@@ -253,6 +259,69 @@ The server follows the Model Context Protocol specification and integrates with 
 - **Azure DevOps Client**: Wrapper around `azure-devops-node-api` for Wiki API operations
 - **Tool Handlers**: Five main tools implementing MCP tool interface
 - **Authentication**: Azure CLI-based authentication with PAT fallback
+
+## 📦 Package Publishing & Release Management
+
+### Version Bumping
+
+The project includes automated version bumping scripts for semantic versioning:
+
+```bash
+# Bump patch version (1.0.0 → 1.0.1) - for bug fixes
+npm run version:patch
+
+# Bump minor version (1.0.0 → 1.1.0) - for new features  
+npm run version:minor
+
+# Bump major version (1.0.0 → 2.0.0) - for breaking changes
+npm run version:major
+```
+
+Each version bump command automatically:
+1. Updates the version in `package.json`
+2. Creates a git commit with the version number
+3. Creates a git tag (e.g., `v1.0.1`)
+
+### Publishing to NPM
+
+The project uses GitHub Actions for automated publishing to npm:
+
+#### Prerequisites
+1. **NPM Account**: Create an account at [npmjs.com](https://www.npmjs.com/)
+2. **NPM Token**: Generate an automation token from your npm profile
+3. **GitHub Secret**: Add the `NPM_TOKEN` to your repository secrets
+
+#### Publishing Workflow
+
+```bash
+# 1. Ensure you're on main branch and up to date
+git checkout main
+git pull origin main
+
+# 2. Run pre-publish validation (optional but recommended)
+npm run release
+
+# 3. Bump version (creates commit + tag)
+npm run version:patch  # or minor/major based on your changes
+
+# 4. Push to trigger automated publishing
+git push origin main --tags
+```
+
+#### What Happens Next
+
+When you push version tags, the GitHub Actions workflow automatically:
+1. **Runs Tests**: Executes lint, test, and build on multiple Node.js versions
+2. **Publishes Package**: Uploads to npm registry if all tests pass
+3. **Makes Available**: Package becomes available via `npm install azure-devops-wiki-mcp`
+
+### CI/CD Pipeline
+
+The automated pipeline includes:
+- **Lint**: ESLint validation
+- **Test**: Jest tests on Node.js 18, 20, and 22
+- **Build**: TypeScript compilation
+- **Publish**: Automated npm publishing on version tags
 
 ## 🤝 Contributing
 

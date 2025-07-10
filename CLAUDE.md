@@ -26,6 +26,12 @@ npm run lint
 
 # Clean build artifacts
 npm run clean
+
+# Version bump and publishing
+npm run version:patch   # Bump patch version (1.0.0 → 1.0.1)
+npm run version:minor   # Bump minor version (1.0.0 → 1.1.0)
+npm run version:major   # Bump major version (1.0.0 → 2.0.0)
+npm run release         # Run build, test, and lint checks before publishing
 ```
 
 ## Architecture
@@ -227,3 +233,72 @@ npm test
 - All request parameters are validated using Zod schemas in `src/types.ts`
 - Environment variables are validated using `EnvironmentConfigSchema` in `src/types.ts`
 - Server configuration is loaded from environment variables in `src/server.ts`
+
+## Package Publishing & Release Management
+
+### Version Bumping
+
+The project includes automated version bumping scripts:
+
+```bash
+# Bump patch version (1.0.0 → 1.0.1) - for bug fixes
+npm run version:patch
+
+# Bump minor version (1.0.0 → 1.1.0) - for new features
+npm run version:minor
+
+# Bump major version (1.0.0 → 2.0.0) - for breaking changes
+npm run version:major
+```
+
+Each version bump command:
+1. Updates `package.json` version
+2. Creates a git commit with the version number
+3. Creates a git tag (e.g., `v1.0.1`)
+
+### Publishing to NPM
+
+The project uses GitHub Actions for automated publishing:
+
+1. **Setup NPM Token**: Add `NPM_TOKEN` to GitHub repository secrets
+2. **Bump Version**: Use one of the version bump commands above
+3. **Push Changes**: Push the version commit and tag to trigger publishing
+   ```bash
+   git push origin main --tags
+   ```
+
+### Publishing Workflow
+
+The complete publishing workflow:
+
+```bash
+# 1. Ensure you're on main branch and up to date
+git checkout main
+git pull origin main
+
+# 2. Run pre-publish validation
+npm run release
+
+# 3. Bump version (creates commit + tag)
+npm run version:patch  # or minor/major
+
+# 4. Push to trigger automated publishing
+git push origin main --tags
+```
+
+### CI/CD Pipeline
+
+The GitHub Actions workflow (`.github/workflows/ci-cd.yml`) includes:
+
+- **Lint Job**: Runs ESLint on Node.js 18
+- **Test Job**: Runs Jest tests on Node.js 18, 20, and 22
+- **Build Job**: Compiles TypeScript and uploads artifacts
+- **Publish Job**: Automatically publishes to npm when version tags are pushed
+
+### NPM Package Configuration
+
+The package is configured for public publishing:
+- **Registry**: https://registry.npmjs.org (public)
+- **Access**: Public package
+- **Files**: Only `dist/` directory is published
+- **Binary**: `mcp-server-azure-devops-wiki` command available globally
