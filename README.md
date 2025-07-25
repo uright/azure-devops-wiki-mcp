@@ -2,6 +2,10 @@
 
 A Model Context Protocol (MCP) server that brings Azure DevOps Wiki context to your AI agents, enabling seamless integration with Azure DevOps wikis.
 
+<a href="https://glama.ai/mcp/servers/@uright/azure-devops-wiki-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@uright/azure-devops-wiki-mcp/badge" alt="Azure DevOps Wiki Server MCP server" />
+</a>
+
 ## 📄 Table of Contents
 
 - [🌟 Project Overview](#-project-overview)
@@ -9,7 +13,7 @@ A Model Context Protocol (MCP) server that brings Azure DevOps Wiki context to y
 - [🔌 Installation & Getting Started](#-installation--getting-started)
 - [🔑 Authentication](#-authentication)
 - [🛠️ Development](#️-development)
-- [🏗️ Architecture](#️-architecture)
+- [🏗️ Architecture](#-architecture)
 - [🤝 Contributing](#-contributing)
 - [📝 License](#-license)
 
